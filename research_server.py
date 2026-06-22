@@ -6,11 +6,29 @@ import os
 from typing import List
 from mcp.server.fastmcp import FastMCP
 
+from rag_index import HybridIndex
+
+_hybrid_index = HybridIndex()
+_index_loaded = False
+
+#Its primary purpose is to defer expensive operations (such as loading deep learning models, reading files, or generating vector embeddings) 
+# until the exact moment a user performs their first search, rather than doing it when the server boots up.
+def _ensure_index_loaded():
+    global _index_loaded
+    if not _index_loaded:
+        _hybrid_index.load_cache_or_build()
+        _index_loaded = True
+
 
 PAPER_DIR = "papers"
 
 # Initialize FastMCP server
 mcp = FastMCP("research", host="0.0.0.0", port=int(os.environ.get("PORT", 8001)))
+
+#Call LLM for dynamic search across all saved papers on disk using hybrid search architecture.
+@mcp.tool
+def hybrid_search_papers(query: str,top_k: int = 5,alpha: float = 0.5)->List[dict]:
+    
 
 @mcp.tool()
 def search_papers(topic: str, max_results: int = 5) -> List[str]:
