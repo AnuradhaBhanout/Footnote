@@ -72,7 +72,29 @@ class HybridIndex:
 
 
     # Cache to disk 
-    
+    def _save_cache(self):
+        with open(INDEX_CACHE,"wb") as f:
+            pickle.dump(
+                {
+                    "paper_ids":self.paper_ids,"texts":self.texts,"embeddings":self.embeddings},f,
+                
+            )
+
+    def load_cache_or_build(self):
+        if os.path.isfile(INDEX_CACHE):
+            with open(INDEX_CACHE,"rb") as f:
+                data = pickle.load(f)
+            self.paper_ids = data["paper_ids"]
+            self.texts = data["texts"]
+            self.embeddings = data["embeddings"]
+            tokenized_corpus = [simple_tokenize(t) for t in self.texts]
+            self.bm25 = BM25Okapi(tokenized_corpus) if self.texts else BM25Okapi([[""]])
+
+        else:
+            self.build()
+
+
+# Defines the entry point for the hybrid search query
 
 
 
