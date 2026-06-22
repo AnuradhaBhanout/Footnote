@@ -95,6 +95,41 @@ class HybridIndex:
 
 
 # Defines the entry point for the hybrid search query
+    def search(self,query: str,top_k: int=5,alpha: float =0.5) -> list:
+
+       if not self.paper_ids:
+          return[]
+    
+       # used to generate semantic text embeddings  
+       query_vec = self.model.encode([query] ,convert_to_numpy=True,normalize_embeddings=True)[0]  
+    
+       dense_scores = self.embeddings @ query_vec   #Cosine Similarity
+
+       # Cal Sparse(Keyword) score
+       bm25_scores = np.array(self.bm25.get_scores(simple_tokenize(query)))
+
+       dense_norm = self._min_max(dense_scores) # 0 or 1
+
+       bm25_norm = self._min_max(bm25_scores)   # 0 or 1
+
+       combined = alpha * dense_norm + (1-alpha) * bm25_norm
+
+       top_indices = np.argsort(combined)[::-1][:top_k]
+
+       return[
+           {
+               "paper_id":self.paper_ids[i],
+               "score":float(combined[i]),
+               "dense_score": float(dense_norm[i]),
+               "bm25_score":float(bm25_norm[i]),
+               
+           }
+           for i in top_indices
+       ]
+
+
+    @staticmethod
+
 
 
 
