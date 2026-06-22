@@ -129,6 +129,10 @@ class HybridIndex:
 
 
     @staticmethod
+    def _min_max(scores: np.ndarray)-> np.ndarray:
+        if scores.max() == scores.min():
+            return np.zeros_like(scores)
+        return (scores - scores.min())/(scores.max() - scores.min()) 
 
 
 
