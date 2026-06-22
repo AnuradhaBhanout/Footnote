@@ -1,0 +1,17 @@
+# Virtual environment
+.venv/
+__pycache__/
+*.pyc
+
+# Environment variables / API Keys
+.env
+*.env.*
+
+# Local AI Models and large vector stores
+models/
+.chroma/
+faiss_index/
+
+# OS files
+.DS_Store
+Thumbs.db

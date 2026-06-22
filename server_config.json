@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "remote_research": {
+      "url": "https://mcpchatbot-5.onrender.com/sse",
+      "timeout": 30
+    },
+    "fetch": {
+      "command": "uvx.exe",
+      "args": ["mcp-server-fetch"]
+    },
+    "filesystem": {
+      "command": "npx.cmd",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "C:\\Users\\anura\\Desktop"
+      ]
+    }
+  }
+}
