@@ -29,3 +29,50 @@ def load_all_papers() -> dict:
     return all_papers
 
 # Turn paper into text text chunks
+def paper_to_text(paper_info:dict)-> str:
+    """Concatenate title and summary into one chunk for both  BM25 and embeddings."""
+    title = paper_info.get("title","")
+    summary = paper_info.get("summary","")
+    return f"{title}. {summary}"
+
+# BM25 just need a lowercase tokens (Tokerizer for BM25)
+def simple_tokenize(text: str)-> list:
+    return text.lower().split()
+
+class HybridIndex:
+    def __init__(self,model_name:str = "all_MiniLM-L6-v2"):
+        self.model = SentenceTransformer(model_name)
+        self.paper_ids = []
+        self.texts = []
+        self.embeddings = None
+        self.bm25 = None
+        
+    def build(self):
+        """Recompute the index from whatever is currently in papers/."""
+        papers = load_all_papers()
+        self.paper_ids = list(papers.keys())
+        self.texts = [paper_to_text(papers[pid]) for pid in self.paper_ids]
+
+        #If no papers have been downloaded yet (or the database is empty),   
+        if not self.texts:
+            self.embeddings = np.zeros((0,384))
+            self.bm25 = BM25Okapi([[""]])
+            return
+        
+        #Dense vector - one per paper
+        self.embeddings = self.model.encode(
+            self.texts,convert_to_numpy=True,normalize_embeddings=True
+        )
+
+        #Sparse index - needs tokenized corpus
+        tokenized_corpus = [simple_tokenize(t) for t in self.texts]
+        self.bm25 = BM25Okapi(tokenized_corpus)
+
+        self._save_cache()
+
+
+    # Cache to disk 
+    
+
+
+
