@@ -292,6 +292,11 @@ class MCP_ChatBot:
                     parts = query.split()
                     command = parts[0].lower()
 
+                    if command == '/clear':
+                        self.messages = []
+                        print("Conversation history cleared.")
+                        continue
+
                     if command == '/prompts':
                         await self.list_prompts()
                     elif command == '/prompt':

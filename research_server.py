@@ -7,6 +7,9 @@ import os
 from typing import List
 from mcp.server.fastmcp import FastMCP
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from rag_index import HybridIndex,load_all_papers
 from openai import OpenAI
 
@@ -25,7 +28,7 @@ _evaluator_client =OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
 )
 
-EVALUATOR_MODEL = "meta-llama/llama-3.1-8b-instruct:free"
+EVALUATOR_MODEL = "openrouter/free"
 
 def evaluate_relevance(query:str,results:list)->dict:
     """LLM-as-judge: is at least one retrieved paper actually relevant, or is this a bad batch?"""
@@ -48,8 +51,21 @@ def evaluate_relevance(query:str,results:list)->dict:
     )
 
     try:
-        return json.loads(response.choices[0].message.content)
+        # return json.loads(response.choices[0].message.content)
+        content = response.choices[0].message.content.strip()
+        
+        # --- STRIP MARKDOWN BACKTICKS FOR ROBUST PARSING ---
+        if content.startswith("```json"):
+            content = content[7:]
+        if content.endswith("```"):
+            content = content[:-3]
+        content = content.strip()
+        # ---------------------------------------------------
+        return json.loads(content)
+    
     except (json.JSONDecodeError,AttributeError):
+        # Log the raw text to see what the LLM returned on parse failure
+        logging.error(f"[evaluator parse error]: {str(e)} - raw text: {response.choices[0].message.content}")
         return{"sufficient":True,"best_paper_id":results[0]["paper_id"],"reason":"Judge Parse failure - defaulted to top result."}
 
 
