@@ -6,7 +6,7 @@ import os
 from typing import List
 from mcp.server.fastmcp import FastMCP
 
-from rag_index import HybridIndex
+from rag_index import HybridIndex,load_all_papers
 
 _hybrid_index = HybridIndex()
 _index_loaded = False
@@ -26,9 +26,23 @@ PAPER_DIR = "papers"
 mcp = FastMCP("research", host="0.0.0.0", port=int(os.environ.get("PORT", 8001)))
 
 #Call LLM for dynamic search across all saved papers on disk using hybrid search architecture.
-@mcp.tool
+@mcp.tool()
 def hybrid_search_papers(query: str,top_k: int = 5,alpha: float = 0.5)->List[dict]:
     
+    """
+    Search across ALL previously saved papers (any topic) using hybrid retrieval:
+    combines semantic similarity (embeddings) with keyword matching (BM25).
+
+    Args:
+        query: natural language search query
+        top_k: number of results to return (default: 5)
+        alpha: 1.0 = pure semantic, 0.0 = pure keyword, 0.5 = balanced (default)
+
+    Returns:
+        List of dicts with paper_id, title, score, dense_score, bm25_score
+    """
+
+
     #If this is the first search of the session, it loads the embedding model and the cached papers into memory. 
     # If it has already run, it skips the step to maintain fast response times.
     _ensure_index_loaded()
@@ -42,8 +56,11 @@ def hybrid_search_papers(query: str,top_k: int = 5,alpha: float = 0.5)->List[dic
 
     papers = load_all_papers()
 
+    print(f"\n[hybrid_search debug] query='{query}' alpha={alpha}")
     for r in results:
         r["title"] = papers.get(r["paper_id"], {}).get("title","Unknown") 
+        print(f"  {r['paper_id']} | combined={r['score']:.3f} | dense={r['dense_score']:.3f} | bm25={r['bm25_score']:.3f} | {r['title']}")
+
 
     return results                                                                              
 
@@ -106,6 +123,10 @@ def search_papers(topic: str, max_results: int = 5) -> List[str]:
         json.dump(papers_info, json_file, indent=2)
     
     print(f"Results are saved in: {file_path}")
+    
+     #  rebuilt the index when new papers are saved
+    _ensure_index_loaded()
+    _hybrid_index.build()
     
     return paper_ids
 

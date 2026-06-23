@@ -13,7 +13,8 @@
       "args": [
         "-y",
         "@modelcontextprotocol/server-filesystem",
-        "C:\\Users\\anura\\Desktop"
+        "C:\\Users\\anura\\AI\\Projects\\RAGchatbot"
+        
       ]
     }
   }
