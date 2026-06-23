@@ -57,19 +57,12 @@ class MCP_ChatBot:
     async def connect_to_server(self,server_name: str,server_config: dict)-> None:
       """connect to a single MCP server and adapt tools natively into LangChain"""
       try:
-           if "url" in server_config:
-            # Remote server reached over HTTP/SSE
-               transport = await self.exit_stack.enter_async_context(
-                   sse_client(server_config["url"],timeout=server_config.get("timeout", 5))
-                )
-               
-           else:
-               server_params = StdioServerParameters(**server_config)
-               transport = await self.exit_stack.enter_async_context(
+           server_params = StdioServerParameters(**server_config)
+           stdio_transport = await self.exit_stack.enter_async_context(
                stdio_client(server_params)
-               )
+           )
 
-           read,write = transport
+           read,write = stdio_transport
            session = await self.exit_stack.enter_async_context(
                ClientSession(read,write)
            )
@@ -132,7 +125,7 @@ class MCP_ChatBot:
 
       except Exception as e:
           print(f"failed to connect to {server_name}: {e}")
-        
+
 
 
     async def connect_to_servers(self):
@@ -141,8 +134,9 @@ class MCP_ChatBot:
         try:
           with open("server_config.json","r") as file:
             data = json.load(file)
-        
+            
           for server_name,server_config in data.get("mcpServers",{}).items():
+            print(f"{server_name} JSON printed {server_config}")
             await self.connect_to_server(server_name,server_config)
         
         except Exception as e:
@@ -225,11 +219,19 @@ class MCP_ChatBot:
 
     async def process_query(self, query:str):
         #create_agent automates parallel calls, self-corrects minor tool exceptions, 
-        # and applies protection frameworks against runaway infinite routing loops.
+        # and applies protec tion frameworks against runaway infinite routing loops.
         
         agent = create_agent(
             model = self.llm,
-            tools=self.available_tools
+            tools=self.available_tools,
+            system_prompt=(
+                "You have real tools available. When asked to fetch a page, search for something, "
+                "extract paper info, or save/write a file, you MUST call the corresponding tool — "
+                "never say you did something unless you actually called the tool for it. "
+                "When you call hybrid_search_papers, check the evaluator_verdict.sufficient field "
+                "in its response. If false, do NOT answer from those results — instead try "
+                "search_papers or fetch to find better sources before responding."
+            )                       
         )
 
         # messages = [{'role':'user','content':'query'}]
@@ -328,6 +330,7 @@ class MCP_ChatBot:
 
                 
 async def main():
+    print("CHATBOT")
     chatbot = MCP_ChatBot()
     try:
         t0 = time.time()

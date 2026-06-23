@@ -40,7 +40,7 @@ def simple_tokenize(text: str)-> list:
     return text.lower().split()
 
 class HybridIndex:
-    def __init__(self,model_name:str = "all_MiniLM-L6-v2"):
+    def __init__(self,model_name:str = "all-MiniLM-L6-v2"):
         self.model = SentenceTransformer(model_name)
         self.paper_ids = []
         self.texts = []
@@ -92,6 +92,12 @@ class HybridIndex:
 
         else:
             self.build()
+
+    def refresh_if_stale(self):
+        current_papers = load_all_papers()
+        if set(current_papers.keys()) != set(self.paper_ids):
+            self.build()
+
 
 
 # Defines the entry point for the hybrid search query

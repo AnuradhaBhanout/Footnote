@@ -1,5 +1,6 @@
 # %%writefile mcp_project/research_server.py
-
+import sys
+import logging
 import arxiv
 import json
 import os
@@ -7,9 +8,53 @@ from typing import List
 from mcp.server.fastmcp import FastMCP
 
 from rag_index import HybridIndex,load_all_papers
+from openai import OpenAI
+
+logging.basicConfig(
+    filename="research_server_debug.log",
+    level=logging.INFO,
+    format="%(asctime)s %(message)s",
+)
 
 _hybrid_index = HybridIndex()
 _index_loaded = False
+
+
+_evaluator_client =OpenAI(
+    base_url = "https://openrouter.ai/api/v1",
+    api_key=os.getenv("OPENAI_API_KEY"),
+)
+
+EVALUATOR_MODEL = "meta-llama/llama-3.1-8b-instruct:free"
+
+def evaluate_relevance(query:str,results:list)->dict:
+    """LLM-as-judge: is at least one retrieved paper actually relevant, or is this a bad batch?"""
+    if not results:
+        return{"sufficient": False,"best_paper_id": None,"reason":"No results retrieved."}
+    
+    candidates = "\n".join(f"- {r['paper_id']}: {r['title']}" for r in results)
+
+    prompt = f"""You are a strict relevance judge. Query: "{query}"
+
+    Retrieved papers:{candidates}
+    Does AT LEAST ONE paper genuinely answer the query - not just share the few words with it?
+    Respond with ONLY this JSON, nothing else:
+    {{"sufficient":true or false,"best_paper_id":"<id or null>","reason":"<one sentence>"}}
+    """
+    response = _evaluator_client.chat.completions.create(
+        model=EVALUATOR_MODEL,
+        messages=[{"role":"user","content":prompt}],
+        max_tokens=150,
+    )
+
+    try:
+        return json.loads(response.choices[0].message.content)
+    except (json.JSONDecodeError,AttributeError):
+        return{"sufficient":True,"best_paper_id":results[0]["paper_id"],"reason":"Judge Parse failure - defaulted to top result."}
+
+
+
+
 
 #Its primary purpose is to defer expensive operations (such as loading deep learning models, reading files, or generating vector embeddings) 
 # until the exact moment a user performs their first search, rather than doing it when the server boots up.
@@ -23,23 +68,19 @@ def _ensure_index_loaded():
 PAPER_DIR = "papers"
 
 # Initialize FastMCP server
-mcp = FastMCP("research", host="0.0.0.0", port=int(os.environ.get("PORT", 8001)))
+#mcp = FastMCP("research", host="0.0.0.0", port=int(os.environ.get("PORT", 8001)))
+mcp = FastMCP("research")
 
 #Call LLM for dynamic search across all saved papers on disk using hybrid search architecture.
 @mcp.tool()
 def hybrid_search_papers(query: str,top_k: int = 5,alpha: float = 0.5)->List[dict]:
     
     """
-    Search across ALL previously saved papers (any topic) using hybrid retrieval:
-    combines semantic similarity (embeddings) with keyword matching (BM25).
-
-    Args:
-        query: natural language search query
-        top_k: number of results to return (default: 5)
-        alpha: 1.0 = pure semantic, 0.0 = pure keyword, 0.5 = balanced (default)
+    Search ALL previously saved papers using hybrid retrieval (BM25 + embeddings),
+    then have a separate judge model verify the results are actually relevant.
 
     Returns:
-        List of dicts with paper_id, title, score, dense_score, bm25_score
+       Returns: {"results": [...], "evaluator_verdict": {"sufficient": bool, "best_paper_id": str, "reason": str}}
     """
 
 
@@ -56,13 +97,17 @@ def hybrid_search_papers(query: str,top_k: int = 5,alpha: float = 0.5)->List[dic
 
     papers = load_all_papers()
 
-    print(f"\n[hybrid_search debug] query='{query}' alpha={alpha}")
+    #print(f"\n[hybrid_search debug] query='{query}' alpha={alpha}",file=sys.stderr)
+    logging.info(f"[hybrid_search debug] query='{query}' alpha={alpha}")
     for r in results:
         r["title"] = papers.get(r["paper_id"], {}).get("title","Unknown") 
-        print(f"  {r['paper_id']} | combined={r['score']:.3f} | dense={r['dense_score']:.3f} | bm25={r['bm25_score']:.3f} | {r['title']}")
+        # print(f"  {r['paper_id']} | combined={r['score']:.3f} | dense={r['dense_score']:.3f} | bm25={r['bm25_score']:.3f} | {r['title']}",file=sys.stderr)
+        logging.info(f"  {r['paper_id']} | combined={r['score']:.3f} | dense={r['dense_score']:.3f} | bm25={r['bm25_score']:.3f} | {r['title']}")
 
+    judgment = evaluate_relevance(query,results)
+    logging.info(f"[evaluator] sufficient={judgment.get('sufficient')} reason={judgment.get('reason')}")
 
-    return results                                                                              
+    return {"results": results,"evaluator_verdict": judgment}                                                                               
 
 
 
@@ -122,7 +167,7 @@ def search_papers(topic: str, max_results: int = 5) -> List[str]:
     with open(file_path, "w") as json_file:
         json.dump(papers_info, json_file, indent=2)
     
-    print(f"Results are saved in: {file_path}")
+    print(f"Results are saved in: {file_path}",file=sys.stderr)
     
      #  rebuilt the index when new papers are saved
     _ensure_index_loaded()
@@ -153,7 +198,7 @@ def extract_info(paper_id: str) -> str:
                         if paper_id in papers_info:
                             return json.dumps(papers_info[paper_id], indent=2)
                 except (FileNotFoundError, json.JSONDecodeError) as e:
-                    print(f"Error reading {file_path}: {str(e)}")
+                    print(f"Error reading {file_path}: {str(e)}",file=sys.stderr)
                     continue
     
     return f"There's no saved information related to paper {paper_id}."
@@ -255,4 +300,5 @@ Please present both detailed information about each paper and a high-level synth
 
 if __name__ == "__main__":
     # Initialize and run the server
-    mcp.run(transport='sse')
+    mcp.run(transport='stdio')
+    #mcp.run(transport='sse')
