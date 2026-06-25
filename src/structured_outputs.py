@@ -35,19 +35,18 @@ class TriageAssessment(BaseModel):
 
 
 
+class QueryReformulation(BaseModel):
+    """
+    Used when a search returned poor/insufficient results - ask the
+    model to retry with better terms.
 
-    class QueryReformulation(BaseModel):
-        """
-        Used when a search returned poor/insufficient results - ask the
-        model to retry with better terms.
+    """
 
-        """
+    reformulated_query: str = Field(
+        description="A rewritten version of the original query using different terms,"
+        "broader or narrower scope , or synonyms - aimed at finding better results than the original phrasing did"
+    )
 
-        reformulated_query: str = Field(
-            description="A rewritten version of the original query using different terms,"
-            "broader or narrower scope , or synonyms - aimed at finding better results than the original phrasing did"
-        )
-
-        reasoning: str = Field(
-            description="One sentence on what changed and why it might work better"
-        )
+    reasoning: str = Field(
+        description="One sentence on what changed and why it might work better"
+    )
