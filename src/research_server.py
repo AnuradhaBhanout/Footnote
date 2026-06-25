@@ -7,8 +7,8 @@ import os
 from typing import List
 from mcp.server.fastmcp import FastMCP
 
-from dotenv import load_dotenv
-load_dotenv()
+from dotenv import load_dotenv,find_dotenv
+load_dotenv(find_dotenv())
 
 from rag_index import HybridIndex,load_all_papers
 from openai import OpenAI
@@ -66,7 +66,7 @@ def evaluate_relevance(query:str,results:list)->dict:
     except (json.JSONDecodeError,AttributeError) as e:
         # Log the raw text to see what the LLM returned on parse failure
         logging.error(f"[evaluator parse error]: {str(e)} - raw text: {response.choices[0].message.content if response.choices else 'No choices available'}")
-        return{"sufficient":True,
+        return{"sufficient":False,
                "best_paper_id":results[0]["paper_id"]if results else None,
                "reason":"Judge Parse failure - defaulted to top result."}
 
