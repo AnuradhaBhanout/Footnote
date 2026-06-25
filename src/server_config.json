@@ -1,0 +1,20 @@
+{
+    "mcpServers": {
+        "research": {
+            "command": "uv",
+           "args": ["run", "research_server.py"]
+        },
+        "fetch": {
+            "command": "uvx.exe",
+            "args": ["mcp-server-fetch"]
+        },
+        "filesystem": {
+            "command": "npx.cmd",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-filesystem",
+                "C:\\Users\\anura\\AI\\Projects\\RAGchatbot\\papers"
+            ]
+        }
+    }
+}
