@@ -40,7 +40,7 @@ class MCP_ChatBot:
 
        
         self.llm = ChatOpenAI(
-            model="openai/gpt-oss-120b:free", # Target a solid open-weights model
+            model="openrouter/free", # Target a solid open-weights model
             openai_api_base="https://openrouter.ai/api/v1",  # Connect directly to OpenRouter 
             openai_api_key=openai_key,
             max_tokens=2024
@@ -231,6 +231,10 @@ class MCP_ChatBot:
                 "When you call hybrid_search_papers, check the evaluator_verdict.sufficient field "
                 "in its response. If false, do NOT answer from those results — instead try "
                 "search_papers or fetch to find better sources before responding."
+                "When citing a paper, you MUST use the exact title and authors as returned by the tool. "
+                "NEVER alter, paraphrase, or invent a title, author, or finding. If a retrieved paper's "
+                "actual title doesn't genuinely relate to the query, EXCLUDE it from your answer entirely "
+                "rather than reinterpreting what it's about."
             )                       
         )
 
