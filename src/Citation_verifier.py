@@ -24,3 +24,19 @@ def extract_real_papers_from_tool_results(messages: list) -> dict:
             real_papers[match.group(2)] = match.group(1)
 
     return real_papers
+
+def _title_overlap_ration(real_title: str,answer_text: str) -> float:
+    """
+    What graction of the real title's significant words actually 
+    appear in the answer.
+    """
+    significant_words = [w.lower().strip(".,:;\"'()")  for w in real_title.split() if len(w)>3 ]
+    if not significant_words:
+        return 1.0
+    
+    answer_lower = answer_text.lower()
+    matched = sum(1 for w in significant_words if w in answer_lower)
+
+    return matched/len(significant_words)
+
+
