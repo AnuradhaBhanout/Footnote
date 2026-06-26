@@ -59,3 +59,13 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
             SystemMessage(content=TRIAGE_SYSTEM_PROMPT),
             HumanMessage(content=state["original_query"]),
         ])
+
+# Implementing HUMAN IN LOOP
+        if not assessment.is_clear:
+            human_answer = interrupt({
+                "question": assessment.clarifying_question,
+                "options": assessment.possible_interpretations,
+            })
+            return {**state,"current_query":human_answer,"retry_count":0}
+        
+        return{**state,"current_query": state["original_query"],"retry_count":0}
