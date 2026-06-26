@@ -40,3 +40,29 @@ def _title_overlap_ration(real_title: str,answer_text: str) -> float:
     return matched/len(significant_words)
 
 
+def verify_citation(answer_text:str,messages:list,overlap_threshold: float = 0.4) -> dict:
+    """
+    Returns {"passed": bool, "issues": [str, ...]}.
+    Fails if: a cited paper_id never appeared in any real tool result(fabricated ID),
+    or a cited paper_id's real title shares too little overlap with the answer text
+    (right ID, wrong/invented title or findings - the harder fabrication case).
+    """
+    real_papers = extract_real_papers_from_tool_results(messages)
+    cited_ids = set(ARXIV_ID_PATTERN.findall(answer_text))
+
+    if not cited_ids:
+        return {"passed":True,"issues": []}
+    
+    issues = []
+    for paper_id in cited_ids:
+        if paper_id not in real_papers:
+            issues.append(f"Cited paper_id '{paper_id}' was never returned by any tool - likely fabricated.")
+            continue
+
+        real_title= real_papers[paper_id]
+        overlap = _title_overlap_ration(real_title,answer_text)
+        if overlap < overlap_threshold:
+            issues.append(f"paper '{paper_id}' is real, but its actual title (\"{real_title}\")")
+            f"barely appears in the answer (overlap={overlap: .2f}) - title/findings may be invented."
+
+        return{"passed": len(issues) == 0, "issues":issues}
