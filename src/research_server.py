@@ -318,6 +318,30 @@ Follow these instructions:
 Please present both detailed information about each paper and a high-level synthesis of the research landscape in {topic}."""
 
 
+@mcp.tool()
+def check_semantic_cache(query: str) -> dict:
+    """Check if a sufficiently similar question was already answered against the current saved papers."""
+    _ensure_index_loaded()
+    corpus_version = SemanticCache.corpus_version(_hybrid_index.paper_ids)
+    hit = _semantic_cache.lookup(query,corpus_version)
+    if hit:
+        return{
+            "hit":True,
+            "answer":hit["answer"],
+            "similarity": hit["similarity"]
+        }
+    return{"hit":False,"answer":None}
+
+@mcp.tool()
+def store_semantic_cache(query: str, answer: str)-> dict:
+    """Store a verified answer in the semantic cache for furture similar questions."""
+    corpus_version = SemanticCache.corpus_version(_hybrid_index.paper_ids)
+    _semantic_cache.store(query,answer,corpus_version)
+    return {"stored":True}
+
+
+
+
 if __name__ == "__main__":
     # Initialize and run the server
     mcp.run(transport='stdio')
