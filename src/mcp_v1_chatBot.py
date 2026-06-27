@@ -18,6 +18,10 @@ nest_asyncio.apply()
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage,AIMessage,ToolMessage
 from langchain.agents import create_agent
+from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.types import Command
+from Graph_pipeline import build_graph
+import uuid
 
 from  langchain_mcp_adapters.tools import convert_mcp_tool_to_langchain_tool
 
@@ -237,6 +241,40 @@ class MCP_ChatBot:
                 "rather than reinterpreting what it's about."
             )                       
         )
+        
+        cache_check = next(t for t in self.available_tools if t.name == "check_semantic_cache")
+        cache_store = next(t for t in self.available_tools if t.name == "store_semantic_cache")
+
+        graph = build_graph(self.llm,agent,cache_check,cache_store)
+
+        with SqliteSaver.from_conn_string("conversations.db")as checkpointer:
+            app = graph.compile(checkpointer= checkpointer)
+            config = {"configurable":
+                      {
+                          "thread_id": self.thread_id
+                      }}
+            
+            result = await app.ainvoke(
+                {
+                    "original_query":query,
+                    "messages":self.messages,
+                    "retry_count":0
+                },
+                config
+            )
+
+            if "__interrupt__" in result:
+                question_data = result["__interrupt__"][0].value
+                print(f"AI: {question_data['question']}")
+                if question_data.get("options"):
+                    print("Possible meanings:", ", ".join(question_data["options"]))
+
+                answer = (await asyncio.to_thread(input,"\nQuery:")).strip()
+                result = await app.ainvoke(Command(resume=answer),config)
+
+            self.messages = result.get("messages",self.messages)
+            print(f"AI: {result['draft_answer']}")
+
 
         # messages = [{'role':'user','content':'query'}]
         # replaced with LANGCHAIN
