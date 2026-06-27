@@ -130,6 +130,12 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
 
     graph = StateGraph(GraphState)
     graph.add_node("check_cache",check_cache)
+    graph.add_node("triage_query",triage_query)
+    graph.add_node("run_agent",run_agent)
+    graph.add_node("check_citations",check_citations)
+    graph.add_node("retry_with_feedback",retry_with_feedback)
+    graph.add_node("fallback",fallback)
+    graph.add_node("finalize",finalize)
 
 
 
