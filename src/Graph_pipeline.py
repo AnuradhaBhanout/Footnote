@@ -96,7 +96,40 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
             return "fallback"
         return "retry_with_feedback"
     
+
+
+    async def retry_with_feedback(state: GraphState) -> GraphState:
+        issues_text = "; ".join(state["citation_issues"])
+        corrective_query = (
+            f"{state['current_query']}\n\n"
+            f"IMPORTANT: Your previous answer had citation problem: {issues_text}."
+            f"Use ONLY the exact paper_id/title pairs returned by the tools - do not"
+            f"Invent or alter any title, author, or finding."
+        )
+        return {**state,"current_query": corrective_query,"retry_count": state["retry_count"]+1}
     
+
+    def fallback(state: GraphState)->GraphState:
+        return{
+            **state,
+            "draft_answer": "I don't have enough verified information to answer that accurately"
+            "from your saved papers. Could you rephrase, or ask me to search again wit different terms?",
+
+        }
+    
+
+    async def finalize(state: GraphState)-> GraphState:
+        await cache_store_tool.ainvoke(
+            {
+                "query":state["original_query"],
+                "answer":state["draft_answer"]
+            }
+        )
+        return state
+    
+
+    graph = StateGraph(GraphState)
+    graph.add_node("check_cache",check_cache)
 
 
 
