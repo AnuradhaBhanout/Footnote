@@ -25,3 +25,7 @@ class SemanticCache:
         with open(self.cache_file,"wb") as f:
             pickle.dump(self.entries,f)
         
+    @staticmethod
+    def corpus_version(paper_ids: list) -> str:
+        # creating a fingerprint of id's
+        return hashlib.md5(",".join(sorted(paper_ids)).encode()).hexdigest()
