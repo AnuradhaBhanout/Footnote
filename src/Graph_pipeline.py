@@ -137,7 +137,27 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
     graph.add_node("fallback",fallback)
     graph.add_node("finalize",finalize)
 
+    graph.set_entry_point("check_cache")
+    graph.add_conditional_edges("check_cache",after_cache,{
+        "end":END,
+        "triage_query": "triage_query"
+    })
+    graph.add_edge("triage_query","run_agent")
+    graph.add_edge("run_agent","check_citations")
+    graph.add_conditional_edges(
+        "check_citations", after_citation_check,{
+            "finalize":"finalize",
+            "end_no_cache":END,
+            "retry_with_feedback":"retry_with_feedback",
+            "fallback":"fallback",
+        }
+    )
 
+    graph.add_edge("retry_with_feedback","run_agent")
+    graph.add_edge("finalize",END)
+    graph.add_edge("fallback",END)
+
+    return graph
 
 
 
