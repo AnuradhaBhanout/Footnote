@@ -6,6 +6,7 @@ import json
 import os
 from typing import List
 from mcp.server.fastmcp import FastMCP
+from Semantic_cache import SemanticCache
 
 from dotenv import load_dotenv,find_dotenv
 load_dotenv(find_dotenv())
@@ -22,6 +23,7 @@ logging.basicConfig(
 _hybrid_index = HybridIndex()
 _index_loaded = False
 
+_semantic_cache = SemanticCache(model=_hybrid_index.model) # reuse the loaded model
 
 _evaluator_client =OpenAI(
     base_url = "https://openrouter.ai/api/v1",
