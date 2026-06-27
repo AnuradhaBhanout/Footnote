@@ -69,3 +69,46 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
             return {**state,"current_query":human_answer,"retry_count":0}
         
         return{**state,"current_query": state["original_query"],"retry_count":0}
+    
+
+
+    async def run_agent(state: GraphState)-> GraphState:
+        messages = state["messages"]+[HumanMessage(content=state["current_query"])]
+        agent_state = await agent.ainvoke({"messages":messages})
+        final = agent_state["messages"][-1]
+        return {**state,"messages":agent_state["messages"],"draft_answer": final.conent}
+    
+    def check_citations(state: GraphState)-> GraphState:
+        result = verify_citation(state["draft_answer"],state["messages"])
+        return {**state,"citation_check_passed":result["passed"], "citation_issues":result["issues"]}
+    
+    def _used_actions_tools(state:GraphState)->bool:
+        for msg in state["messages"]:
+            for tc in getattr(msg,"tool_calls",None) or []:
+                if tc["name"] in ACTION_TOOL_NAMES:
+                    return True
+        return False
+    
+    def after_citation_check(state: GraphState)-> str:
+        if state["citaation_check_passed"]:
+            return "end_no_cache" if _used_actions_tools(state) else "finalize"
+        if state["retry_count"] >= MAX_RETRIES:
+            return "fallback"
+        return "retry_with_feedback"
+    
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
