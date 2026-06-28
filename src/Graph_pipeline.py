@@ -4,7 +4,7 @@ from langgraph.types import interrupt, Command
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from structured_outputs import TriageAssessment, QueryReformulation
-from Citation_verifier import verify_citation
+from citation_verifier import verify_citation
 
 MAX_RETRIES = 2
 
