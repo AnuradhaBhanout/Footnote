@@ -6,7 +6,7 @@ import json
 import os
 from typing import List
 from mcp.server.fastmcp import FastMCP
-from Semantic_cache import SemanticCache
+from semantic_cache import SemanticCache
 
 from dotenv import load_dotenv,find_dotenv
 load_dotenv(find_dotenv())
