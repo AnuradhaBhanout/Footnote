@@ -42,7 +42,7 @@ class GraphState(TypedDict):
 
 def build_graph(llm,agent,cache_check_tool, cache_store_tool):
      
-    triage_llm = llm.with_structured_output(TriageAssessment)
+    triage_llm = llm.with_structured_output(TriageAssessment,method="function_calling")
     reformulate_llm = llm.with_structured_output(QueryReformulation)
 
     async def check_cache(state: GraphState)-> GraphState:

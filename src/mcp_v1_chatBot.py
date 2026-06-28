@@ -41,6 +41,7 @@ class MCP_ChatBot:
         
         self.sessions = {}
         self.exit_stack = AsyncExitStack()
+        self.thread_id = str(uuid.uuid4()) 
 
        
         self.llm = ChatOpenAI(
