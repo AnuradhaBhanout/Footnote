@@ -70,6 +70,7 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
 
     async def check_cache(state: GraphState)-> GraphState:
         raw = await cache_check_tool.ainvoke({"query": state["original_query"]})
+        print(f"[DEBUG raw cache result] {raw!r}")
         result = _parse_tool_result(raw)
 
         if result.get("hit"):
@@ -101,7 +102,7 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
         messages = state["messages"]+[HumanMessage(content=state["current_query"])]
         agent_state = await agent.ainvoke({"messages":messages})
         final = agent_state["messages"][-1]
-        return {**state,"messages":agent_state["messages"],"draft_answer": final.conent}
+        return {**state,"messages":agent_state["messages"],"draft_answer": final.content}
     
     def check_citations(state: GraphState)-> GraphState:
         result = verify_citation(state["draft_answer"],state["messages"])

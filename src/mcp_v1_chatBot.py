@@ -367,7 +367,9 @@ class MCP_ChatBot:
                 print("\n")
             
             except Exception as e:
-                print(f"\nError encountered during chat_loop : {str(e)}")
+                import traceback
+                traceback.print_exc()
+                #print(f"\nError encountered during chat_loop : {str(e)}")
 
     
 
