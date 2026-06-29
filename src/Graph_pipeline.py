@@ -5,6 +5,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from structured_outputs import TriageAssessment, QueryReformulation
 from citation_verifier import verify_citation
+import json
 
 MAX_RETRIES = 2
 
@@ -30,6 +31,28 @@ Write any carifiying question in plain, friendly language - do not assume the us
 """
 
 
+def _parse_tool_result(result) -> dict:
+    """
+    Direct tool.ainvoke() calls (outside the agent's own tool-calling loop) can come back as either
+    an already-parsed dict,or as MCP's raw content-block list depending on the adapter.
+    Normalize to plain dict either way.
+    """
+    if isinstance(result,dict):
+        return result
+    if isinstance(result,list) and result:
+        first = result[0]
+        text = first.get("text") if isinstance(first,dict) else getattr(first,"text",None)
+
+        if text:
+            try:
+                return json.loads(text)
+            except json.JSONDecodeError:
+                return{}
+            
+    return {}
+
+
+
 class GraphState(TypedDict):
     original_query: str
     current_query: str
@@ -46,7 +69,9 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
     reformulate_llm = llm.with_structured_output(QueryReformulation)
 
     async def check_cache(state: GraphState)-> GraphState:
-        result = await cache_check_tool.ainvoke({"query": state["original_query"]})
+        raw = await cache_check_tool.ainvoke({"query": state["original_query"]})
+        result = _parse_tool_result(raw)
+
         if result.get("hit"):
             return{**state, "cache_hit":True,"draft_answer":result["answer"]}
         return {**state,"cache_hit":False}
@@ -60,7 +85,7 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
             HumanMessage(content=state["original_query"]),
         ])
 
-# Implementing HUMAN IN LOOP
+# Implementing    HUMAN IN LOOP     ##################
         if not assessment.is_clear:
             human_answer = interrupt({
                 "question": assessment.clarifying_question,
