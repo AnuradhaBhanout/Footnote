@@ -18,7 +18,7 @@ nest_asyncio.apply()
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage,AIMessage,ToolMessage
 from langchain.agents import create_agent
-from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.types import Command
 from graph_pipeline import build_graph
 import uuid
@@ -248,7 +248,7 @@ class MCP_ChatBot:
 
         graph = build_graph(self.llm,agent,cache_check,cache_store)
 
-        with SqliteSaver.from_conn_string("conversations.db")as checkpointer:
+        async with AsyncSqliteSaver.from_conn_string("conversations.db") as checkpointer:
             app = graph.compile(checkpointer= checkpointer)
             config = {"configurable":
                       {
