@@ -1,7 +1,7 @@
 from typing import TypedDict, Optional,Any
 from langgraph.graph import StateGraph, END
 from langgraph.types import interrupt, Command
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage,AIMessage
 
 from structured_outputs import TriageAssessment, QueryReformulation
 from citation_verifier import verify_citation
@@ -92,7 +92,25 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
                 "question": assessment.clarifying_question,
                 "options": assessment.possible_interpretations,
             })
-            return {**state,"current_query":human_answer,"retry_count":0}
+
+            # HUMAN - AI - HUMAN ### Conversation flow ###
+            new_messages = state["messages"] + [
+                AIMessage(content=assessment.clarifying_question),
+                HumanMessage(content=human_answer)
+            ]
+
+            # combined query so the agent has more context
+            combined_query = (
+                f"User originally asked:{state['original_query']}."
+                f"Clarification provided: {human_answer}"
+            )
+
+
+            return {
+                **state,
+                "messages":new_messages,
+                "current_query":combined_query,
+                "retry_count":0}
         
         return{**state,"current_query": state["original_query"],"retry_count":0}
     
