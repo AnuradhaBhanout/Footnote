@@ -355,12 +355,12 @@ class MCP_ChatBot:
 
         final_response = result['draft_answer']
         logger.info("Graph finished execution.")
-        if final_response:
-           print(f"\nAIIIIII : {final_response}")
+        # if final_response:
+        #    print(f"\nAIIIIII : {final_response}")
 
-        last_msg = self.messages[-1] if self.messages else None
-        if last_msg:
-            print(f"\nAINNNNNNN : [Completed task: {getattr(last_msg, 'content', 'No text content')}]")
+        # last_msg = self.messages[-1] if self.messages else None
+        # if last_msg:
+        #     print(f"\nAINNNNNNN : [Completed task: {getattr(last_msg, 'content', 'No text content')}]")
 
             
 
