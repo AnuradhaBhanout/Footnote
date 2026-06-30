@@ -459,6 +459,7 @@ class MCP_ChatBot:
 
     async def cleanup(self):
         """Cleanly close all resources using AsyncExitStack."""
+        await self.checkpointer.__aexit__(None, None, None)
         await self.exit_stack.aclose()
 
 
