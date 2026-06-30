@@ -21,7 +21,20 @@ from langchain.agents import create_agent
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.types import Command
 from graph_pipeline import build_graph
+from langchain_ollama import ChatOllama
 import uuid
+import logging
+
+# Configure logging to write to debug.log
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.FileHandler("debug.log"),
+        logging.StreamHandler() # This also prints to your terminal
+    ]
+)
+logger = logging.getLogger("RAG-Chatbot")
 
 from  langchain_mcp_adapters.tools import convert_mcp_tool_to_langchain_tool
 
@@ -45,12 +58,19 @@ class MCP_ChatBot:
 
        
         self.llm = ChatOpenAI(
-            model="openrouter/free", # Target a solid open-weights model
+            model="openrouter/owl-alpha", # Target a solid open-weights model
             openai_api_base="https://openrouter.ai/api/v1",  # Connect directly to OpenRouter 
             openai_api_key=openai_key,
             max_tokens=2024
         )
-        
+        # self.llm = ChatOllama(
+        #     model="llama3.1",
+        #     temperature=0,
+        #     #format= "json"
+        # )
+
+
+
         self.available_tools = []
 
         self.available_prompts = []
@@ -223,23 +243,31 @@ class MCP_ChatBot:
 
 
     async def process_query(self, query:str):
+        logger.info(f"--- START PROCESS_QUERY: {query} ---")
         #create_agent automates parallel calls, self-corrects minor tool exceptions, 
         # and applies protec tion frameworks against runaway infinite routing loops.
+        tool_names_str =  ", ".join([t.name for t in self.available_tools])
         
         agent = create_agent(
             model = self.llm,
             tools=self.available_tools,
             system_prompt=(
-                "You have real tools available. When asked to fetch a page, search for something, "
-                "extract paper info, or save/write a file, you MUST call the corresponding tool — "
-                "never say you did something unless you actually called the tool for it. "
-                "When you call hybrid_search_papers, check the evaluator_verdict.sufficient field "
-                "in its response. If false, do NOT answer from those results — instead try "
-                "search_papers or fetch to find better sources before responding."
-                "When citing a paper, you MUST use the exact title and authors as returned by the tool. "
-                "NEVER alter, paraphrase, or invent a title, author, or finding. If a retrieved paper's "
-                "actual title doesn't genuinely relate to the query, EXCLUDE it from your answer entirely "
-                "rather than reinterpreting what it's about."
+            f"SYSTEM ROLE: You are an expert Research Assistant with access to these specific tools: [{tool_names_str}].\n\n"
+            
+            "CRITICAL TOOL RULES:\n"
+            "1. NEVER invent a tool name. Use ONLY the names listed above.\n"
+            "2. When you use a tool, you MUST wait for the tool output before claiming you have finished the task.\n"
+            "3. If a tool result for 'hybrid_search_papers' has 'evaluator_verdict.sufficient: false', "
+            "do NOT provide an answer. Instead, try 'search_papers' or 'fetch' to find better information.\n\n"
+
+            "CITATION & INTEGRITY RULES:\n"
+            "- You must use the EXACT title and authors as returned by the tools.\n"
+            "- NEVER alter, paraphrase, or invent a paper title or finding.\n"
+            "- If a paper is not relevant to the query, EXCLUDE it entirely.\n\n"
+
+            "OUTPUT FORMAT:\n"
+            "After all tool calls are complete, provide a friendly, plain-language summary of your findings. "
+            "If citations are used, list them clearly."
             )                       
         )
         
@@ -255,6 +283,8 @@ class MCP_ChatBot:
                           "thread_id": self.thread_id
                       }}
             
+
+            logger.info("Invoking Graph...")
             result = await app.ainvoke(
                 {
                     "original_query":query,
@@ -264,40 +294,55 @@ class MCP_ChatBot:
                 config
             )
 
-            if "__interrupt__" in result:
+            while "__interrupt__" in result:
+                logger.info("Graph Interrupted: Waiting for user clarification.")
                 question_data = result["__interrupt__"][0].value
                 print(f"AI: {question_data['question']}")
                 if question_data.get("options"):
                     print("Possible meanings:", ", ".join(question_data["options"]))
-
+                
+                #Get human clarification
                 answer = (await asyncio.to_thread(input,"\nQuery:")).strip()
+
+                # Resume graph execution with the user's answer
+                logger.info(f"Resuming graph with: {answer}")
                 result = await app.ainvoke(Command(resume=answer),config)
 
             self.messages = result.get("messages",self.messages)
-            print(f"AI: {result['draft_answer']}")
+            final_response = result['draft_answer']
+            logger.info("Graph finished execution.")
+            if final_response:
+               print(f"\nAIIIIII : {final_response}")
 
+            last_msg = self.messages[-1] if self.messages else None
+            if last_msg:
+                print(f"\nAINNNNNNN : [Completed task: {getattr(last_msg, 'content', 'No text content')}]")
 
-        # messages = [{'role':'user','content':'query'}]
-        # replaced with LANGCHAIN
-        self.messages.append(HumanMessage(content=query))
+            
+
+ #########   this part is now calling vai run_agent node in graph_pipeline.py   #################
+
+        # # messages = [{'role':'user','content':'query'}]
+        # # replaced with LANGCHAIN
+        # self.messages.append(HumanMessage(content=query))
 
         t0 = time.time()
-        # replaced with LANGCHAIN
-        # llm_with_tools = self.llm.bind_tools(self.available_tools)
-        # response = await llm_with_tools.ainvoke(self.messages)
-        agent_state = await agent.ainvoke({"messages": self.messages})
+        # # replaced with LANGCHAIN
+        # # llm_with_tools = self.llm.bind_tools(self.available_tools)
+        # # response = await llm_with_tools.ainvoke(self.messages)
+        # agent_state = await agent.ainvoke({"messages": self.messages})
         print(f"[timing] agent response took {time.time() - t0:.2f}s")
 
-        self.messages = agent_state["messages"]
+        # self.messages = agent_state["messages"]
 
-        # self.messages.append(response)
+        # # self.messages.append(response)
 
-        # if response.content:
-        #     print(f"AI: {response.content}")
+        # # if response.content:
+        # #     print(f"AI: {response.content}")
 
-        final_response = self.messages[-1]
-        if final_response.content:
-            print(f"AI: {final_response.content}")
+        # final_response = self.messages[-1]
+        # if final_response.content:
+        #     print(f"AI: {final_response.content}")
 
             
 
