@@ -78,6 +78,11 @@ class MCP_ChatBot:
         self.tool_to_session: Dict[str, ClientSession] = {}
 
         self.messages = []  
+        
+        
+
+
+
 
     async def connect_to_server(self,server_name: str,server_config: dict)-> None:
       """connect to a single MCP server and adapt tools natively into LangChain"""
@@ -151,6 +156,40 @@ class MCP_ChatBot:
       except Exception as e:
           print(f"failed to connect to {server_name}: {e}")
 
+
+
+    async def _build_agent_and_graph(self):
+        tool_names_str =  ", ".join([t.name for t in self.available_tools])
+        self.agent = create_agent(
+            model = self.llm,
+            tools=self.available_tools,
+
+            system_prompt=(
+            f"SYSTEM ROLE: You are an expert Research Assistant with access to these specific tools: [{tool_names_str}].\n\n"
+            
+            "CRITICAL TOOL RULES:\n"
+            "1. NEVER invent a tool name. Use ONLY the names listed above.\n"
+            "2. When you use a tool, you MUST wait for the tool output before claiming you have finished the task.\n"
+            "3. If a tool result for 'hybrid_search_papers' has 'evaluator_verdict.sufficient: false', "
+            "do NOT provide an answer. Instead, try 'search_papers' or 'fetch' to find better information.\n\n"
+
+            "CITATION & INTEGRITY RULES:\n"
+            "- You must use the EXACT title and authors as returned by the tools.\n"
+            "- NEVER alter, paraphrase, or invent a paper title or finding.\n"
+            "- If a paper is not relevant to the query, EXCLUDE it entirely.\n\n"
+
+            "OUTPUT FORMAT:\n"
+            "After all tool calls are complete, provide a friendly, plain-language summary of your findings. "
+            "If citations are used, list them clearly."
+            )                       
+        )
+
+        cache_check = next(t for t in self.available_tools if t.name == "check_semantic_cache")
+        cache_store = next(t for t in self.available_tools if t.name == "store_semantic_cache")
+
+        graph = build_graph(self.llm,self.agent,cache_check,cache_store)
+        self.checkpointer = AsyncSqliteSaver.from_conn_string("conversations.db")
+        self.app = graph.compile(checkpointer=await self.checkpointer.__aenter__())
 
 
     async def connect_to_servers(self):
@@ -246,77 +285,77 @@ class MCP_ChatBot:
         logger.info(f"--- START PROCESS_QUERY: {query} ---")
         #create_agent automates parallel calls, self-corrects minor tool exceptions, 
         # and applies protec tion frameworks against runaway infinite routing loops.
-        tool_names_str =  ", ".join([t.name for t in self.available_tools])
+        # tool_names_str =  ", ".join([t.name for t in self.available_tools])
         
-        agent = create_agent(
-            model = self.llm,
-            tools=self.available_tools,
-            system_prompt=(
-            f"SYSTEM ROLE: You are an expert Research Assistant with access to these specific tools: [{tool_names_str}].\n\n"
+        # agent = create_agent(
+        #     model = self.llm,
+        #     tools=self.available_tools,
+        #     system_prompt=(
+        #     f"SYSTEM ROLE: You are an expert Research Assistant with access to these specific tools: [{tool_names_str}].\n\n"
             
-            "CRITICAL TOOL RULES:\n"
-            "1. NEVER invent a tool name. Use ONLY the names listed above.\n"
-            "2. When you use a tool, you MUST wait for the tool output before claiming you have finished the task.\n"
-            "3. If a tool result for 'hybrid_search_papers' has 'evaluator_verdict.sufficient: false', "
-            "do NOT provide an answer. Instead, try 'search_papers' or 'fetch' to find better information.\n\n"
+        #     "CRITICAL TOOL RULES:\n"
+        #     "1. NEVER invent a tool name. Use ONLY the names listed above.\n"
+        #     "2. When you use a tool, you MUST wait for the tool output before claiming you have finished the task.\n"
+        #     "3. If a tool result for 'hybrid_search_papers' has 'evaluator_verdict.sufficient: false', "
+        #     "do NOT provide an answer. Instead, try 'search_papers' or 'fetch' to find better information.\n\n"
 
-            "CITATION & INTEGRITY RULES:\n"
-            "- You must use the EXACT title and authors as returned by the tools.\n"
-            "- NEVER alter, paraphrase, or invent a paper title or finding.\n"
-            "- If a paper is not relevant to the query, EXCLUDE it entirely.\n\n"
+        #     "CITATION & INTEGRITY RULES:\n"
+        #     "- You must use the EXACT title and authors as returned by the tools.\n"
+        #     "- NEVER alter, paraphrase, or invent a paper title or finding.\n"
+        #     "- If a paper is not relevant to the query, EXCLUDE it entirely.\n\n"
 
-            "OUTPUT FORMAT:\n"
-            "After all tool calls are complete, provide a friendly, plain-language summary of your findings. "
-            "If citations are used, list them clearly."
-            )                       
-        )
+        #     "OUTPUT FORMAT:\n"
+        #     "After all tool calls are complete, provide a friendly, plain-language summary of your findings. "
+        #     "If citations are used, list them clearly."
+        #     )                       
+        # )
         
-        cache_check = next(t for t in self.available_tools if t.name == "check_semantic_cache")
-        cache_store = next(t for t in self.available_tools if t.name == "store_semantic_cache")
+        # cache_check = next(t for t in self.available_tools if t.name == "check_semantic_cache")
+        # cache_store = next(t for t in self.available_tools if t.name == "store_semantic_cache")
 
-        graph = build_graph(self.llm,agent,cache_check,cache_store)
+        # graph = build_graph(self.llm,agent,cache_check,cache_store)
 
-        async with AsyncSqliteSaver.from_conn_string("conversations.db") as checkpointer:
-            app = graph.compile(checkpointer= checkpointer)
-            config = {"configurable":
-                      {
-                          "thread_id": self.thread_id
-                      }}
-            
-
-            logger.info("Invoking Graph...")
-            result = await app.ainvoke(
+        # async with AsyncSqliteSaver.from_conn_string("conversations.db") as checkpointer:
+        #     app = graph.compile(checkpointer= checkpointer)
+        config = {"configurable":
                 {
-                    "original_query":query,
-                    "messages":self.messages,
-                    "retry_count":0
-                },
-                config
-            )
+                    "thread_id": self.thread_id
+                }}
+        
 
-            while "__interrupt__" in result:
-                logger.info("Graph Interrupted: Waiting for user clarification.")
-                question_data = result["__interrupt__"][0].value
-                print(f"AI: {question_data['question']}")
-                if question_data.get("options"):
-                    print("Possible meanings:", ", ".join(question_data["options"]))
-                
-                #Get human clarification
-                answer = (await asyncio.to_thread(input,"\nQuery:")).strip()
+        logger.info("Invoking Graph...")
+        result = await self.app.ainvoke(
+            {
+                "original_query":query,
+                "messages":self.messages,
+                "retry_count":0
+            },
+            config
+        )
 
-                # Resume graph execution with the user's answer
-                logger.info(f"Resuming graph with: {answer}")
-                result = await app.ainvoke(Command(resume=answer),config)
+        while "__interrupt__" in result:
+            logger.info("Graph Interrupted: Waiting for user clarification.")
+            question_data = result["__interrupt__"][0].value
+            print(f"AI: {question_data['question']}")
+            if question_data.get("options"):
+                print("Possible meanings:", ", ".join(question_data["options"]))
+            
+            #Get human clarification
+            answer = (await asyncio.to_thread(input,"\nQuery:")).strip()
 
-            self.messages = result.get("messages",self.messages)
-            final_response = result['draft_answer']
-            logger.info("Graph finished execution.")
-            if final_response:
-               print(f"\nAIIIIII : {final_response}")
+            # Resume graph execution with the user's answer
+            logger.info(f"Resuming graph with: {answer}")
+            result = await self.app.ainvoke(Command(resume=answer),config)
 
-            last_msg = self.messages[-1] if self.messages else None
-            if last_msg:
-                print(f"\nAINNNNNNN : [Completed task: {getattr(last_msg, 'content', 'No text content')}]")
+        self.messages = result.get("messages",self.messages)
+        final_response = result['draft_answer']
+        logger.info("Graph finished execution.")
+        if final_response:
+           print(f"\nAIIIIII : {final_response}")
+
+        last_msg = self.messages[-1] if self.messages else None
+        if last_msg:
+            print(f"\nAINNNNNNN : [Completed task: {getattr(last_msg, 'content', 'No text content')}]")
 
             
 
@@ -431,6 +470,7 @@ async def main():
         t0 = time.time()
         await chatbot.connect_to_servers() 
         print(f"[timing] server connection took {time.time() - t0:.2f}s")
+        await chatbot._build_agent_and_graph()
         await chatbot.chat_loop()
     finally:
         await chatbot.cleanup() 
