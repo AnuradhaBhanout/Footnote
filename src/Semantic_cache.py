@@ -32,6 +32,7 @@ class SemanticCache:
     
 
     def lookup(self, query:str, current_corpus_version: str)-> dict | None:
+       # print("LOOKing up for previous queries asked by the user")
         
         if not self.entries:
             return None
@@ -54,10 +55,10 @@ class SemanticCache:
                 best_score = score
                 best_entry = entry
 
-            if best_entry is not None and best_score >= SIMILARITY_THRESHOLD:
+        if best_entry is not None and best_score >= SIMILARITY_THRESHOLD:
                 return {"answer": best_entry["answer"],"matched_query": best_entry["query"],"similarity": best_score}
 
-            return None
+        return None
 
 
     def store(self, query: str, answer: str, current_corpus_version: str) -> None:
