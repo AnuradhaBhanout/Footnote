@@ -350,6 +350,9 @@ class MCP_ChatBot:
             result = await self.app.ainvoke(Command(resume=answer),config)
 
         self.messages = result.get("messages",self.messages)
+        self.messages = self.messages[-20:]                  # keep last 20 messages only
+
+
         final_response = result['draft_answer']
         logger.info("Graph finished execution.")
         if final_response:
