@@ -1,17 +1,29 @@
 from typing import TypedDict, Optional,Any
 from langgraph.graph import StateGraph, END
 from langgraph.types import interrupt, Command
-from langchain_core.messages import HumanMessage, SystemMessage,AIMessage
+from langchain_core.messages import HumanMessage, SystemMessage,AIMessage,ToolMessage,trim_messages
 
 from structured_outputs import TriageAssessment, QueryReformulation
-from citation_verifier import verify_citation
+from citation_verifier import verify_citations
 import json
+import logging
+
+# Configure logging to write to debug.log
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.FileHandler("debug.log"),
+        logging.StreamHandler() # This also prints to your terminal
+    ]
+)
+logger = logging.getLogger("RAG-Chatbot")
 
 MAX_RETRIES = 2
 
 ACTION_TOOL_NAMES = {"write_file","edit_file","create_directory","move_file","fetch"}
 
-TRIAGE_SYSTEM_PROMPT = """
+TRIAGE_SYSTEM_PROMPT = r"""
 You are a triage assistant for a research helper tool used by everyday\people, not 
 just technical experts. Your only job: decide if the user;s request is specific\
 enough to act on right away, or if it's ambigious and needs a quick clarifying question
@@ -59,14 +71,14 @@ class GraphState(TypedDict):
     messages: list
     cache_hit: bool
     draft_answer: Optional[str]
-    citaation_check_passed: bool
+    citation_check_passed: bool
     citation_issues: list
     retry_count: int
 
 def build_graph(llm,agent,cache_check_tool, cache_store_tool):
      
     triage_llm = llm.with_structured_output(TriageAssessment,method="function_calling")
-    reformulate_llm = llm.with_structured_output(QueryReformulation)
+    reformulate_llm = llm.with_structured_output(QueryReformulation,method="function_calling")
 
     async def check_cache(state: GraphState)-> GraphState:
         raw = await cache_check_tool.ainvoke({"query": state["original_query"]})
@@ -81,50 +93,133 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
         return "end" if state["cache_hit"] else "triage_query"
     
     async def triage_query(state: GraphState) -> GraphState:
-        assessment: TriageAssessment = await triage_llm.ainvoke([
-            SystemMessage(content=TRIAGE_SYSTEM_PROMPT),
-            HumanMessage(content=state["original_query"]),
-        ])
+        logger.info("--- NODE START: triage_query ---")
+
+        if state.get("current_query") and state["current_query"] != state["original_query"]:
+           logger.info("--- TRIAGE: Skipping to agent (already clarified) ---")
+           return state
+        
+        history = state.get("messages",[])
+        recent_context = history[-4:] if history else []
+
+        updated_messages = list(state["messages"])+ [HumanMessage(content=state["original_query"])]
+
+        trimmed_history = trim_messages(
+            updated_messages,
+            max_tokens=12,
+            token_counter=len,
+            strategy="last",
+            include_system=False,
+        )
+        
+        assessment: TriageAssessment = await triage_llm.ainvoke([SystemMessage(content=TRIAGE_SYSTEM_PROMPT)] + trimmed_history)
+        #     SystemMessage(content=TRIAGE_SYSTEM_PROMPT),
+        #     HumanMessage(content=state["original_query"]),
+        # ])
 
 # Implementing    HUMAN IN LOOP     ##################
         if not assessment.is_clear:
+            logger.info(f"--- TRIAGE: Request unclear. Question: {assessment.clarifying_question}")
+            ai_question = assessment.clarifying_question or "I'm not quite sure what you mean. Could you provide more details?"
+            
             human_answer = interrupt({
-                "question": assessment.clarifying_question,
-                "options": assessment.possible_interpretations,
+                "question": ai_question,
+                "options": assessment.possible_interpretations or [],
             })
+            logger.info(f"--- TRIAGE: Resumed with answer: {human_answer}")
+##### HUMAN - AI - HUMAN ### Conversation flow ###
+            
+            updated_messages.append(AIMessage(content=ai_question))
+            updated_messages.append(HumanMessage(content=human_answer))
+                
 
-            # HUMAN - AI - HUMAN ### Conversation flow ###
-            new_messages = state["messages"] + [
-                AIMessage(content=assessment.clarifying_question),
-                HumanMessage(content=human_answer)
-            ]
 
-            # combined query so the agent has more context
-            combined_query = (
-                f"User originally asked:{state['original_query']}."
-                f"Clarification provided: {human_answer}"
-            )
+        #     # combined query so the agent has more context
+        # if recent_context:
+        #     combined_query = (
+        #         f"Conversation so far includes a prior request about: "
+        #         f"{recent_context[0].content if recent_context else ''}. "
+        #         f"User now adds: {state['original_query']}"
+        #     )
 
 
             return {
                 **state,
-                "messages":new_messages,
-                "current_query":combined_query,
+                "messages": updated_messages,
+                "current_query":human_answer,
                 "retry_count":0}
         
-        return{**state,"current_query": state["original_query"],"retry_count":0}
+        logger.info("--- TRIAGE: Request is clear. Proceeding to Agent.")
+        return{**state,
+               "messages": updated_messages,
+               "current_query": state["original_query"],
+               "retry_count":0}
     
 
 
     async def run_agent(state: GraphState)-> GraphState:
-        messages = state["messages"]+[HumanMessage(content=state["current_query"])]
-        agent_state = await agent.ainvoke({"messages":messages})
+        logger.info(f"--- NODE START: run_agent with query: {state['current_query']} ---")
+        messages = state["messages"]
+        
+        if not messages or messages[-1].content != state["current_query"]:
+            messages = messages+[HumanMessage(content=state["current_query"])]
+
+        agent_state = await agent.ainvoke({"messages":messages},config={"recursion_limit": 15})
+        logger.info(f"--- AGENT ACTIONS: {[m.tool_calls for m in agent_state['messages'] if hasattr(m, 'tool_calls') and m.tool_calls]} ---")
         final = agent_state["messages"][-1]
-        return {**state,"messages":agent_state["messages"],"draft_answer": final.content}
+        logger.info("--- NODE END: run_agent completed ---")
+
+        new_retry_count = state["retry_count"]
+        if state["messages"] and isinstance(state["messages"][-1], ToolMessage):
+            if "[]" in state["messages"][-1].content: # Simple empty check
+               new_retry_count += 1
+
+        return {
+            **state,
+            "messages":agent_state["messages"],
+            "draft_answer": final.content,
+            "retry_count": new_retry_count
+                }
+    
+
+
+    def should_continue_searching(state: GraphState) -> str:
+        """
+        Conditional edge logic: decide if we need to search again 
+        or move to citation checking.
+        """
+        messages = state.get("messages", [])
+        if not messages:
+            return "ok"
+
+        # Find the last message from a tool
+        last_tool_msg = next((m for m in reversed(messages) if isinstance(m, ToolMessage)), None)
+        
+        if last_tool_msg:
+            try:
+                data = json.loads(last_tool_msg.content)
+                
+                # Check for 'insufficient' verdict OR completely empty results list
+                verdict = data.get("evaluator_verdict", {})
+                results = data.get("results", data.get("papers", []))
+                
+                is_bad = verdict.get("sufficient") is False or len(results) == 0
+                
+                if is_bad and state["retry_count"] < MAX_RETRIES:
+                    logger.info(f"--- LOOP: Search results insufficient. Retrying agent. ---")
+                    return "retry"
+            except:
+                pass # Not JSON or unexpected format, move to citation check
+
+        return "ok"
+    
+
     
     def check_citations(state: GraphState)-> GraphState:
-        result = verify_citation(state["draft_answer"],state["messages"])
+        result = verify_citations(state["draft_answer"],state["messages"])
         return {**state,"citation_check_passed":result["passed"], "citation_issues":result["issues"]}
+    
+
     
     def _used_actions_tools(state:GraphState)->bool:
         for msg in state["messages"]:
@@ -134,7 +229,7 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
         return False
     
     def after_citation_check(state: GraphState)-> str:
-        if state["citaation_check_passed"]:
+        if state["citation_check_passed"]:
             return "end_no_cache" if _used_actions_tools(state) else "finalize"
         if state["retry_count"] >= MAX_RETRIES:
             return "fallback"
@@ -194,6 +289,15 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
             "end_no_cache":END,
             "retry_with_feedback":"retry_with_feedback",
             "fallback":"fallback",
+        }
+    )
+
+    graph.add_conditional_edges(
+        "run_agent",
+        should_continue_searching,
+        {
+            "retry": "run_agent",      # Loop back to agent for a better search
+            "ok": "check_citations"     # Proceed normally
         }
     )
 
