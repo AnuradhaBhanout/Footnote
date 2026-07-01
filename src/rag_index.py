@@ -1,13 +1,16 @@
 import os
 import json
-import pickle
+#import pickle
 import numpy as np
 from rank_bm25 import BM25Okapi
 from sentence_transformers import SentenceTransformer
+from psycopg2.extras import execute_values
+
+from db import get_conn 
 
 
 PAPER_DIR = "papers"
-INDEX_CACHE = os.path.join(PAPER_DIR,"_rag_index.pk1")
+#INDEX_CACHE = os.path.join(PAPER_DIR,"_rag_index.pk1")
 
 def load_all_papers() -> dict:
     """Walk every topic folder under papers / and merge all papers_info.json files"""
@@ -68,30 +71,65 @@ class HybridIndex:
         tokenized_corpus = [simple_tokenize(t) for t in self.texts]
         self.bm25 = BM25Okapi(tokenized_corpus)
 
-        self._save_cache()
+        self._upsert_to_db(papers)
 
-
-    # Cache to disk 
-    def _save_cache(self):
-        with open(INDEX_CACHE,"wb") as f:
-            pickle.dump(
-                {
-                    "paper_ids":self.paper_ids,"texts":self.texts,"embeddings":self.embeddings},f,
-                
+    
+    def _upsert_to_db(self,papers: dict):
+        """
+        Upsert paper embeddings into paper_embeddings table.
+        ON CONFLICT updates embedding + text_chunk in case summary changed.
+        
+        """
+        rows = [
+            (
+                pid,
+                papers[pid].get("title",""),
+                self.texts[1],
+                self.embeddings[i].tolist(),         #pgvector expects a list     
             )
+            for i ,pid in enumerate(self.paper_ids)
+        ]
 
-    def load_cache_or_build(self):
-        if os.path.isfile(INDEX_CACHE):
-            with open(INDEX_CACHE,"rb") as f:
-                data = pickle.load(f)
-            self.paper_ids = data["paper_ids"]
-            self.texts = data["texts"]
-            self.embeddings = data["embeddings"]
-            tokenized_corpus = [simple_tokenize(t) for t in self.texts]
-            self.bm25 = BM25Okapi(tokenized_corpus) if self.texts else BM25Okapi([[""]])
+        conn = get_conn()
+        with conn:
+            with conn.cursor() as cur:
+                execute_values(
+                    cur,
+                    """
+                    INSERT INTO paper_embeddings(paper_id,title,text_chunk,embedding)
+                    VALUES %s
+                    ON CONFLICT (paper_id) DO UPDATE
+                        SET title      = EXCLUDED.title,
+                            text_chunk = EXCLUDED.text_chunk,
+                            embedding  = EXCLUDED.embedding,
+                            updated_at = NOW()
+                    """,
+                    rows,
+                    template="(%s, %s, %s, %s::vector)",
+                )
+        conn.close()
 
-        else:
-            self.build()
+    # # Cache to disk 
+    # def _save_cache(self):
+    #     with open(INDEX_CACHE,"wb") as f:
+    #         pickle.dump(
+    #             {
+    #                 "paper_ids":self.paper_ids,"texts":self.texts,"embeddings":self.embeddings},f,
+                
+    #         )
+
+    # def load_cache_or_build(self):
+    #     if os.path.isfile(INDEX_CACHE):
+    #         with open(INDEX_CACHE,"rb") as f:
+    #             data = pickle.load(f)
+    #         self.paper_ids = data["paper_ids"]
+    #         self.texts = data["texts"]
+    #         self.embeddings = data["embeddings"]
+    #         tokenized_corpus = [simple_tokenize(t) for t in self.texts]
+    #         self.bm25 = BM25Okapi(tokenized_corpus) if self.texts else BM25Okapi([[""]])
+
+    #     else:
+    #         self.build()
 
     def refresh_if_stale(self):
         current_papers = load_all_papers()
