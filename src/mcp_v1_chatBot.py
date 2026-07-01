@@ -18,7 +18,9 @@ nest_asyncio.apply()
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage,AIMessage,ToolMessage
 from langchain.agents import create_agent
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+import psycopg
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+# from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.types import Command
 from graph_pipeline import build_graph
 from langchain_ollama import ChatOllama
@@ -41,6 +43,7 @@ from  langchain_mcp_adapters.tools import convert_mcp_tool_to_langchain_tool
 _ = load_dotenv(find_dotenv())
 
 openai_key = os.getenv("OPENAI_API_KEY")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 # class ToolDefinition(TypedDict):
 #     name: str
@@ -188,8 +191,12 @@ class MCP_ChatBot:
         cache_store = next(t for t in self.available_tools if t.name == "store_semantic_cache")
 
         graph = build_graph(self.llm,self.agent,cache_check,cache_store)
-        self.checkpointer = AsyncSqliteSaver.from_conn_string("conversations.db")
-        self.app = graph.compile(checkpointer=await self.checkpointer.__aenter__())
+
+        self._pg_conn = await psycopg.AsyncConnection.connect(DATABASE_URL)
+        self.checkpointer = AsyncPostgresSaver(self._pg_conn)
+
+        await self.checkpointer.setup()     #Creates a Langgraph checkpoint tables on first run
+        self.app = graph.compile(checkpointer=self.checkpointer)
 
 
     async def connect_to_servers(self):
@@ -460,9 +467,9 @@ class MCP_ChatBot:
     
 
     async def cleanup(self):
-        """Cleanly close all resources using AsyncExitStack."""
-        await self.checkpointer.__aexit__(None, None, None)
-        await self.exit_stack.aclose()
+        """Cleanly close all resources """
+        await self._pg_conn.close()      #Close Postgres connection
+        await self.exit_stack.aclose()   # Close MCP server subprocess
 
 
                 
