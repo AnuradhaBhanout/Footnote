@@ -57,3 +57,7 @@ def init_db():
                         );
                   """)
 
+    conn.close()
+    print("[db] Tables ready.")
+
+
