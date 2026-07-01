@@ -15,6 +15,10 @@ load_dotenv(find_dotenv())
 from rag_index import HybridIndex,load_all_papers
 from openai import OpenAI
 
+from db import init_db
+
+init_db()               # creates tables on first run, safe to call every time
+
 logging.basicConfig(
     filename="research_server_debug.log",
     level=logging.INFO,
