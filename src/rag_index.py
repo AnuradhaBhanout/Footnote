@@ -84,7 +84,7 @@ class HybridIndex:
             (
                 pid,
                 papers[pid].get("title",""),
-                self.texts[1],
+                self.texts[i],
                 self.embeddings[i].tolist(),         #pgvector expects a list     
             )
             for i ,pid in enumerate(self.paper_ids)
@@ -109,6 +109,30 @@ class HybridIndex:
                 )
         conn.close()
 
+
+    def load_cache_or_build(self):
+        """
+        Load embeddings from Postgres.
+        Falls back to build() if the table is empty.
+        """
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute("SELECT paper_id,title,text_chunk,embedding FROM paper_embeddings;")
+            rows = cur.fetchall()
+        conn.close()
+
+        if not rows:
+            #Nothing in DB yet - build from disk
+            self.build()
+            return
+        
+        self.paper_ids = [r[0] for r in rows]
+        self.texts = [r[2] for r in rows]
+
+        #pgvectors returns embedding as Python lists: convert to numpy
+        self.embeddings = np.array([r[3] for r in rows],dtype = np.float32)
+        self.bm25 = BM25Okapi( [simple_tokenize(t) for t in self.texts])
+
     # # Cache to disk 
     # def _save_cache(self):
     #     with open(INDEX_CACHE,"wb") as f:
@@ -132,6 +156,9 @@ class HybridIndex:
     #         self.build()
 
     def refresh_if_stale(self):
+        """
+        Compare paper_ids on disk vs in memory.
+        """
         current_papers = load_all_papers()
         if set(current_papers.keys()) != set(self.paper_ids):
             self.build()
