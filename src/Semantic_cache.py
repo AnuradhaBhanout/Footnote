@@ -34,9 +34,10 @@ class SemanticCache:
         try:
             conn = get_conn()
             with conn.cursor() as cur:
-                cur.execute("SELECT query, answer, embedding, corpus_version, created_at"
-                            "FROM semantic_cache ORDER_BY created_at ASC;"
-                            )
+                cur.execute("""
+                            SELECT query, answer, embedding, corpus_version, created_at
+                            FROM semantic_cache ORDER BY created_at ASC;
+                            """)
                 rows = cur.fetchall()
             conn.close()
 
@@ -44,7 +45,7 @@ class SemanticCache:
                 {
                     "query":  r[0],
                     "answer": r[1],
-                    "embeddings": np.array(r[2],dtype = np.float32),
+                    "embedding": np.array(r[2],dtype = np.float32),
                     "corpus_version": r[3],
                     "created_at": r[4].timestamp() if r[4] else time.time(),
                 }
@@ -76,7 +77,7 @@ class SemanticCache:
                         entry["corpus_version"],
                     ),
                 )
-            conn.close()
+        conn.close()
 
 
     @staticmethod
