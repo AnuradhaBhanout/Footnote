@@ -13,3 +13,47 @@ def get_conn():
     conn = psycopg2.connect(DATABASE_URL)
     register_vector(conn)
     return conn
+
+
+def init_db():
+    """"Create required table and extensions if they dont exist.
+    call once at server startup(research_server.py)
+    """
+    conn = get_conn()
+    with conn:
+        with conn.cursor() as cur:
+            # pgvector extension
+            cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+
+            #Rag index  - one row per paper
+            cur.execute(""" 
+            CREATE TABLE IF NOT EXISTS paper_embeddings(
+                    paper_id    TEXT PRIMARY KEY,
+                    title       TEXT,
+                    text_chunk  TEXT,
+                    embedding   vector(384),
+                    updated_at  TIMESTAMP DEFAULT NOW()
+                );
+
+            """)
+
+            #Approximate Nearest neighbor index for fast similarity search
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS paper_embeddings_ivfflat
+                ON paper_embeddings
+                USING ivfflat (embedding vector_cosine_ops)
+                WITH (lists = 100);                           # using K- mean clustring
+                """)
+            
+            # Semantic cache
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS semantic_cache(
+                        id                 SERIAL PRIMARY KEY,
+                        query              TEXT        NOT NULL,
+                        answer             TEXT        NOT NULL,
+                        embedding          vector(384) NOT NULL,
+                        corpus_version     TEXT        NOT NULL,
+                        created_at         TIMESTAMP   DEFAULT NOW()
+                        );
+                  """)
+
