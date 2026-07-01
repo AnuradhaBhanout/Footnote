@@ -97,8 +97,8 @@ def _ensure_index_loaded():
 PAPER_DIR = "papers"
 
 # Initialize FastMCP server
-#mcp = FastMCP("research", host="0.0.0.0", port=int(os.environ.get("PORT", 8001)))
-mcp = FastMCP("research")
+mcp = FastMCP("research", host="0.0.0.0", port=int(os.environ.get("PORT", 8001)))
+# mcp = FastMCP("research")
 
 #Call LLM for dynamic search across all saved papers on disk using hybrid search architecture.
 @mcp.tool()
@@ -355,4 +355,4 @@ def store_semantic_cache(query: str, answer: str)-> dict:
 if __name__ == "__main__":
     # Initialize and run the server
     #mcp.run(transport='stdio')
-    mcp.run(transport='sse',host = "0.0.0.0", port=int(os.environ.get("PORT", 8001)))
+    mcp.run(transport='sse')
