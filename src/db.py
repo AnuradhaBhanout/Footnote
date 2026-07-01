@@ -37,12 +37,12 @@ def init_db():
 
             """)
 
-            #Approximate Nearest neighbor index for fast similarity search
+            #Approximate Nearest neighbor index for fast similarity search   # using K- mean clustring
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS paper_embeddings_ivfflat
                 ON paper_embeddings
                 USING ivfflat (embedding vector_cosine_ops)
-                WITH (lists = 100);                           # using K- mean clustring
+                WITH (lists = 100);                          
                 """)
             
             # Semantic cache
