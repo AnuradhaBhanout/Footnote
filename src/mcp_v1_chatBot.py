@@ -90,12 +90,18 @@ class MCP_ChatBot:
     async def connect_to_server(self,server_name: str,server_config: dict)-> None:
       """connect to a single MCP server and adapt tools natively into LangChain"""
       try:
-           server_params = StdioServerParameters(**server_config)
-           stdio_transport = await self.exit_stack.enter_async_context(
+           if "url" in server_config:
+            # SSE transport
+            transport = await self.exit_stack.enter_async_context(
+                stdio_client(server_config["url"])
+            )
+           else:
+               server_params = StdioServerParameters(**server_config)
+               transport = await self.exit_stack.enter_async_context(
                stdio_client(server_params)
            )
 
-           read,write = stdio_transport
+           read,write = transport
            session = await self.exit_stack.enter_async_context(
                ClientSession(read,write)
            )

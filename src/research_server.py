@@ -354,5 +354,5 @@ def store_semantic_cache(query: str, answer: str)-> dict:
 
 if __name__ == "__main__":
     # Initialize and run the server
-    mcp.run(transport='stdio')
-    #mcp.run(transport='sse')
+    #mcp.run(transport='stdio')
+    mcp.run(transport='sse',host = "0.0.0.0", port=int(os.environ.get("PORT", 8001)))
