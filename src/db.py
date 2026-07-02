@@ -56,6 +56,20 @@ def init_db():
                         created_at         TIMESTAMP   DEFAULT NOW()
                         );
                   """)
+            
+            # Add papers
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS papers (
+                    paper_id    TEXT PRIMARY KEY,
+                    topic       TEXT,
+                    title       TEXT,
+                    authors     JSONB,
+                    summary     TEXT,
+                    pdf_url     TEXT,
+                    published   TEXT,
+                    created_at  TIMESTAMP DEFAULT NOW()
+                );
+            """)
 
     conn.close()
     print("[db] Tables ready.")
