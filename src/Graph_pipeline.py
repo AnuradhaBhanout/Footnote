@@ -3,7 +3,9 @@ from langgraph.graph import StateGraph, END
 from langgraph.types import interrupt, Command
 from langchain_core.messages import HumanMessage, SystemMessage,AIMessage,ToolMessage,trim_messages
 
-from structured_outputs import TriageAssessment, QueryReformulation
+
+
+from structured_outputs import TriageAssessment #QueryReformulation
 from citation_verifier import verify_citations
 import json
 import logging
@@ -78,7 +80,7 @@ class GraphState(TypedDict):
 def build_graph(llm,agent,cache_check_tool, cache_store_tool):
      
     triage_llm = llm.with_structured_output(TriageAssessment,method="function_calling")
-    reformulate_llm = llm.with_structured_output(QueryReformulation,method="function_calling")
+   # reformulate_llm = llm.with_structured_output(QueryReformulation,method="function_calling")
 
     async def check_cache(state: GraphState)-> GraphState:
         raw = await cache_check_tool.ainvoke({"query": state["original_query"]})
@@ -95,12 +97,12 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
     async def triage_query(state: GraphState) -> GraphState:
         logger.info("--- NODE START: triage_query ---")
 
-        if state.get("current_query") and state["current_query"] != state["original_query"]:
+        if state.get("current_query"): #and state["current_query"] != state["original_query"]:
            logger.info("--- TRIAGE: Skipping to agent (already clarified) ---")
            return state
         
         history = state.get("messages",[])
-        recent_context = history[-4:] if history else []
+       # recent_context = history[-4:] if history else []
 
         updated_messages = list(state["messages"])+ [HumanMessage(content=state["original_query"])]
 
@@ -116,6 +118,14 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
         #     SystemMessage(content=TRIAGE_SYSTEM_PROMPT),
         #     HumanMessage(content=state["original_query"]),
         # ])
+        if assessment is None:
+            logger.warning("--- TRIAGE: LLM returned None, defaulting to clear ---")
+            return {
+                **state,
+                "messages": updated_messages,
+                "current_query": state["original_query"],
+                "retry_count": 0
+            }
 
 # Implementing    HUMAN IN LOOP     ##################
         if not assessment.is_clear:
@@ -164,7 +174,16 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
         if not messages or messages[-1].content != state["current_query"]:
             messages = messages+[HumanMessage(content=state["current_query"])]
 
-        agent_state = await agent.ainvoke({"messages":messages},config={"recursion_limit": 15})
+        # Trim before passing to agent — prevents context bloat causing loops
+        messages = trim_messages(
+            messages,
+            max_tokens=40,
+            token_counter=len,
+            strategy="last",
+            include_system=False,
+        )
+
+        agent_state = await agent.ainvoke({"messages":messages},config={"recursion_limit": 25})
         logger.info(f"--- AGENT ACTIONS: {[m.tool_calls for m in agent_state['messages'] if hasattr(m, 'tool_calls') and m.tool_calls]} ---")
         final = agent_state["messages"][-1]
         logger.info("--- NODE END: run_agent completed ---")
@@ -177,7 +196,7 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
         return {
             **state,
             "messages":agent_state["messages"],
-            "draft_answer": final.content,
+            "draft_answer": final.content or "",
             "retry_count": new_retry_count
                 }
     
@@ -282,7 +301,7 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
         "triage_query": "triage_query"
     })
     graph.add_edge("triage_query","run_agent")
-    graph.add_edge("run_agent","check_citations")
+    #graph.add_edge("run_agent","check_citations")
     graph.add_conditional_edges(
         "check_citations", after_citation_check,{
             "finalize":"finalize",
