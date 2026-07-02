@@ -62,7 +62,7 @@ class MCP_ChatBot:
 
        
         self.llm = ChatOpenAI(
-            model="meta-llama/llama-3.1-8b-instruct:free", # Target a solid open-weights model
+            model="nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", # Target a solid open-weights model
             openai_api_base="https://openrouter.ai/api/v1",  # Connect directly to OpenRouter 
             openai_api_key=openai_key,
             max_tokens=2024
@@ -190,6 +190,8 @@ class MCP_ChatBot:
 
             "OUTPUT FORMAT:\n"
             "After all tool calls are complete, provide a friendly, plain-language summary of your findings. "
+            "Provide ONLY the final answer."
+            "Do NOT include your reasoning, planning, or internal thoughts. "
             "If citations are used, list them clearly."
             )                       
         )
