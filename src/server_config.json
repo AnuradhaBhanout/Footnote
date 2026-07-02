@@ -4,10 +4,12 @@
            "url": "http://localhost:8001/sse"
         },
         "fetch": {
-           "url": "http://localhost:8002/sse"
+            "command": "uvx.exe",
+            "args": ["mcp-server-fetch"]
         },
         "filesystem": {
-            "url": "http://localhost:8003/sse"
+            "command": "npx.cmd",
+            "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\anura\\AI\\Projects\\RAGchatbot\\src\\papers"]
         }
     }
 }
