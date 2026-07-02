@@ -96,7 +96,20 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
     
     async def triage_query(state: GraphState) -> GraphState:
         logger.info("--- NODE START: triage_query ---")
-
+            
+        messages = state.get("messages", [])
+        if len(messages) >= 2:
+            last = messages[-1]
+            second_last = messages[-2]
+            if isinstance(last, HumanMessage) and isinstance(second_last, AIMessage) and  last.content != state.get("original_query"):
+                # This is a resumed state — AI asked, human answered
+                logger.info("--- TRIAGE: Resuming, skipping LLM ---")
+                return {
+                    **state,
+                    "current_query": last.content,
+                    "retry_count": 0,
+                }
+            
         if state.get("current_query"): #and state["current_query"] != state["original_query"]:
            logger.info("--- TRIAGE: Skipping to agent (already clarified) ---")
            return state
@@ -186,17 +199,34 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
         agent_state = await agent.ainvoke({"messages":messages},config={"recursion_limit": 25})
         logger.info(f"--- AGENT ACTIONS: {[m.tool_calls for m in agent_state['messages'] if hasattr(m, 'tool_calls') and m.tool_calls]} ---")
         final = agent_state["messages"][-1]
+        draft = final.content if final.content else ""
         logger.info("--- NODE END: run_agent completed ---")
 
-        new_retry_count = state["retry_count"]
-        if state["messages"] and isinstance(state["messages"][-1], ToolMessage):
-            if "[]" in state["messages"][-1].content: # Simple empty check
-               new_retry_count += 1
+        #new_retry_count = state["retry_count"]
+        # if state["messages"] and isinstance(state["messages"][-1], ToolMessage):
+        #     if "[]" in state["messages"][-1].content: # Simple empty check
+        #        new_retry_count += 1
 
+        new_retry_count = state["retry_count"]
+        last_tool = next(
+            (m for m in reversed(agent_state["messages"]) if isinstance(m, ToolMessage)),
+            None
+        )
+        if last_tool:
+            try:
+                data = json.loads(last_tool.content)
+                results = data.get("results", data.get("papers", []))
+                if len(results) == 0:
+                    new_retry_count += 1
+            except (json.JSONDecodeError, AttributeError):
+                pass    
+        
+        if not draft:
+            logger.warning("--- RUN_AGENT: LLM returned empty content ---")
         return {
             **state,
             "messages":agent_state["messages"],
-            "draft_answer": final.content or "",
+            "draft_answer": draft,
             "retry_count": new_retry_count
                 }
     
