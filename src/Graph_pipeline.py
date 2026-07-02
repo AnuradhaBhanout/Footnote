@@ -217,6 +217,7 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
                 content = last_tool.content
                 if isinstance(content,list):
                     content = next( (b["text"] for b in content if isinstance(b,dict) and b.get("type") == "text"),"")
+                    
                 data = json.loads(content)
                 results = data.get("results", data.get("papers", []))
                 if len(results) == 0:

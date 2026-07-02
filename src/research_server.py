@@ -15,7 +15,7 @@ load_dotenv(find_dotenv())
 from rag_index import HybridIndex,load_all_papers
 from openai import OpenAI
 
-from db import init_db
+from db import init_db,get_conn
 
 init_db()               # creates tables on first run, safe to call every time
 
@@ -38,7 +38,7 @@ _evaluator_client =OpenAI(
 #     model="llama3.1",
 #     temperature=0
 # )
-EVALUATOR_MODEL = "meta-llama/llama-3.1-8b-instruct:free"
+EVALUATOR_MODEL = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
 
 def evaluate_relevance(query:str,results:list)->dict:
     """LLM-as-judge: is at least one retrieved paper actually relevant, or is this a bad batch?"""
@@ -197,6 +197,18 @@ def search_papers(topic: str, max_results: int = 5) -> List[str]:
         json.dump(papers_info, json_file, indent=2)
     
     print(f"Results are saved in: {file_path}",file=sys.stderr)
+
+    conn = get_conn()
+    with conn:
+        with conn.cursor() as cur:
+            for pid, info in papers_info.items():
+                cur.execute("""
+                    INSERT INTO papers (paper_id, topic, title, authors, summary, pdf_url, published)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (paper_id) DO NOTHING
+                """, (pid, topic, info['title'], json.dumps(info['authors']),
+                    info['summary'], info['pdf_url'], info['published']))
+    conn.close()
     
      #  rebuilt the index when new papers are saved
     _ensure_index_loaded()
@@ -204,101 +216,170 @@ def search_papers(topic: str, max_results: int = 5) -> List[str]:
     
     return paper_ids
 
+# @mcp.tool()
+# def extract_info(paper_id: str) -> str:
+#     """
+#     Search for information about a specific paper across all topic directories.
+    
+#     Args:
+#         paper_id: The ID of the paper to look for
+        
+#     Returns:
+#         JSON string with paper information if found, error message if not found
+#     """
+ 
+#     for item in os.listdir(PAPER_DIR):
+#         item_path = os.path.join(PAPER_DIR, item)
+#         if os.path.isdir(item_path):
+#             file_path = os.path.join(item_path, "papers_info.json")
+#             if os.path.isfile(file_path):
+#                 try:
+#                     with open(file_path, "r") as json_file:
+#                         papers_info = json.load(json_file)
+#                         if paper_id in papers_info:
+#                             return json.dumps(papers_info[paper_id], indent=2)
+#                 except (FileNotFoundError, json.JSONDecodeError) as e:
+#                     print(f"Error reading {file_path}: {str(e)}",file=sys.stderr)
+#                     continue
+    
+#     return f"There's no saved information related to paper {paper_id}."
+
+
 @mcp.tool()
 def extract_info(paper_id: str) -> str:
-    """
-    Search for information about a specific paper across all topic directories.
-    
-    Args:
-        paper_id: The ID of the paper to look for
-        
-    Returns:
-        JSON string with paper information if found, error message if not found
-    """
- 
-    for item in os.listdir(PAPER_DIR):
-        item_path = os.path.join(PAPER_DIR, item)
-        if os.path.isdir(item_path):
-            file_path = os.path.join(item_path, "papers_info.json")
-            if os.path.isfile(file_path):
-                try:
-                    with open(file_path, "r") as json_file:
-                        papers_info = json.load(json_file)
-                        if paper_id in papers_info:
-                            return json.dumps(papers_info[paper_id], indent=2)
-                except (FileNotFoundError, json.JSONDecodeError) as e:
-                    print(f"Error reading {file_path}: {str(e)}",file=sys.stderr)
-                    continue
-    
-    return f"There's no saved information related to paper {paper_id}."
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT title, authors, summary, pdf_url, published FROM papers WHERE paper_id = %s",
+            (paper_id,)
+        )
+        row = cur.fetchone()
+    conn.close()
 
+    if not row:
+        return f"There's no saved information related to paper {paper_id}."
+
+    return json.dumps({
+        "title": row[0],
+        "authors": row[1],
+        "summary": row[2],
+        "pdf_url": row[3],
+        "published": row[4],
+    }, indent=2)
 
 # Adding resources 
+# @mcp.resource("papers://folders")
+# def get_available_folders() -> str:
+#     """
+#     List all available topic  folders  in the papers directory.
+
+#     This resource provide a simple list of all available topic folders.
+#     """
+#     folders = []
+
+#     # Get all topic directories
+#     if os.path.exists(PAPER_DIR):
+#         for topic_dir in os.listdir(PAPER_DIR):
+#             topic_path = os.path.join(PAPER_DIR,topic_dir)
+#             if os.path.isdir(topic_path):
+#                 papers_file = os.path.join(topic_path,"papers_info.json")
+#                 if os.path.exists(papers_file):
+#                     folders.append(topic_dir)
+
+
+#     # Create a simple markdown list
+#     content = "# Available Topics\n\n"
+#     if folders:
+#         for folder in folders:
+#             content += f"- {folder}\n"
+#         content += f"\nUse @{folder} to access papers in that topic.\n"
+    
+#     else:
+#         content += "No topics found.\n"
+
+#     return content
+
 @mcp.resource("papers://folders")
 def get_available_folders() -> str:
-    """
-    List all available topic  folders  in the papers directory.
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("SELECT DISTINCT topic FROM papers ORDER BY topic;")
+        topics = [r[0] for r in cur.fetchall()]
+    conn.close()
 
-    This resource provide a simple list of all available topic folders.
-    """
-    folders = []
-
-    # Get all topic directories
-    if os.path.exists(PAPER_DIR):
-        for topic_dir in os.listdir(PAPER_DIR):
-            topic_path = os.path.join(PAPER_DIR,topic_dir)
-            if os.path.isdir(topic_path):
-                papers_file = os.path.join(topic_path,"papers_info.json")
-                if os.path.exists(papers_file):
-                    folders.append(topic_dir)
-
-
-    # Create a simple markdown list
     content = "# Available Topics\n\n"
-    if folders:
-        for folder in folders:
-            content += f"- {folder}\n"
-        content += f"\nUse @{folder} to access papers in that topic.\n"
-    
+    if topics:
+        for topic in topics:
+            content += f"- {topic}\n"
+        content += f"\nUse @{topics[-1]} to access papers in that topic.\n"
     else:
         content += "No topics found.\n"
-
     return content
+
+
+# @mcp.resource("papers://{topic}")
+# def get_topic_papers(topic: str) -> str:
+#     """
+#     Get detailed  information about papers on a specific topic.
+
+#     Args:
+#         topic : The research topic to retrieve papers for
+#     """
+#     topic_dir = topic.lower().replace(" ","_")
+#     papers_file = os.path.join(PAPER_DIR,topic_dir,"papers_info.json")
+
+#     if not os.path.exists(papers_file):
+#        return f" # No papers found for topic: {topic}\n\nTry searching for papers on this topic first"
+    
+#     try:
+#         with open(papers_file,'r')as f:
+#             papers_data =json.load(f)
+
+#         #Create content with paper details
+#         content = f"# Papers on {topic.replace('_',' ').title()}\n\n"
+#         content += f"Total Papers: {len(papers_data)}\n\n"
+
+#         for paper_id, paper_info in papers_data.items():
+#             content += f"## {paper_info['title']}\n"
+#             content += f"- **Paper ID**: {paper_id}\n"
+#             content += f"- **Authors**: {'. '.join(paper_info['authors'])}\n"
+#             content += f"- **Published**: {paper_info['published']}\n"
+#             content += f"- **PDF URL**: [{paper_info['pdf_url']}]   ({paper_info['pdf_url']})\n\n"
+#             content += f"### Summary\n{paper_info['summary'][:500]}...\n\n"
+#             content += "---\n\n" 
+            
+#         return content
+#     except json.JSONDecodeError:
+#         return f"# Error reading papers data for {topic}\n\nThe papers data file is corrupted."
+
 
 @mcp.resource("papers://{topic}")
 def get_topic_papers(topic: str) -> str:
-    """
-    Get detailed  information about papers on a specific topic.
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT paper_id, title, authors, summary, pdf_url, published FROM papers WHERE topic = %s",
+            (topic.lower().replace(" ", "_"),)
+        )
+        rows = cur.fetchall()
+    conn.close()
 
-    Args:
-        topic : The research topic to retrieve papers for
-    """
-    topic_dir = topic.lower().replace(" ","_")
-    papers_file = os.path.join(PAPER_DIR,topic_dir,"papers_info.json")
+    if not rows:
+        return f"# No papers found for topic: {topic}\n\nTry searching for papers on this topic first."
 
-    if not os.path.exists(papers_file):
-       return f" # No papers found for topic: {topic}\n\nTry searching for papers on this topic first"
-    
-    try:
-        with open(papers_file,'r')as f:
-            papers_data =json.load(f)
+    content = f"# Papers on {topic.replace('_',' ').title()}\n\nTotal Papers: {len(rows)}\n\n"
+    for r in rows:
+        content += f"## {r[1]}\n"
+        content += f"- **Paper ID**: {r[0]}\n"
+        content += f"- **Authors**: {', '.join(r[2])}\n"
+        content += f"- **Published**: {r[5]}\n"
+        content += f"- **PDF URL**: {r[4]}\n\n"
+        content += f"### Summary\n{r[3][:500]}...\n\n---\n\n"
+    return content
 
-        #Create content with paper details
-        content = f"# Papers on {topic.replace('_',' ').title()}\n\n"
-        content += f"Total Papers: {len(papers_data)}\n\n"
 
-        for paper_id, paper_info in papers_data.items():
-            content += f"## {paper_info['title']}\n"
-            content += f"- **Paper ID**: {paper_id}\n"
-            content += f"- **Authors**: {'. '.join(paper_info['authors'])}\n"
-            content += f"- **Published**: {paper_info['published']}\n"
-            content += f"- **PDF URL**: [{paper_info['pdf_url']}]   ({paper_info['pdf_url']})\n\n"
-            content += f"### Summary\n{paper_info['summary'][:500]}...\n\n"
-            content += "---\n\n" 
-            
-        return content
-    except json.JSONDecodeError:
-        return f"# Error reading papers data for {topic}\n\nThe papers data file is corrupted."
+
+
 
 @mcp.prompt()
 def generate_search_prompt(topic: str, num_papers: int = 5) -> str:
