@@ -26,6 +26,7 @@ from graph_pipeline import build_graph
 from langchain_ollama import ChatOllama
 import uuid
 import logging
+import selectors
 
 # Configure logging to write to debug.log
 logging.basicConfig(
@@ -61,7 +62,7 @@ class MCP_ChatBot:
 
        
         self.llm = ChatOpenAI(
-            model="openrouter/owl-alpha", # Target a solid open-weights model
+            model="meta-llama/llama-3.1-8b-instruct:free", # Target a solid open-weights model
             openai_api_base="https://openrouter.ai/api/v1",  # Connect directly to OpenRouter 
             openai_api_key=openai_key,
             max_tokens=2024
@@ -93,7 +94,7 @@ class MCP_ChatBot:
            if "url" in server_config:
             # SSE transport
             transport = await self.exit_stack.enter_async_context(
-                stdio_client(server_config["url"])
+                sse_client(server_config["url"])
             )
            else:
                server_params = StdioServerParameters(**server_config)
@@ -198,7 +199,7 @@ class MCP_ChatBot:
 
         graph = build_graph(self.llm,self.agent,cache_check,cache_store)
 
-        self._pg_conn = await psycopg.AsyncConnection.connect(DATABASE_URL)
+        self._pg_conn = await psycopg.AsyncConnection.connect(DATABASE_URL,autocommit=True)
         self.checkpointer = AsyncPostgresSaver(self._pg_conn)
 
         await self.checkpointer.setup()     #Creates a Langgraph checkpoint tables on first run
@@ -474,7 +475,8 @@ class MCP_ChatBot:
 
     async def cleanup(self):
         """Cleanly close all resources """
-        await self._pg_conn.close()      #Close Postgres connection
+        if hasattr(self, '_pg_conn'):
+            await self._pg_conn.close()      #Close Postgres connection
         await self.exit_stack.aclose()   # Close MCP server subprocess
 
 
@@ -493,4 +495,9 @@ async def main():
   
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.set_event_loop_policy(
+        asyncio.DefaultEventLoopPolicy()
+    )
+    loop = asyncio.SelectorEventLoop(selectors.SelectSelector())
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(main())
