@@ -38,7 +38,7 @@ _evaluator_client =OpenAI(
 #     model="llama3.1",
 #     temperature=0
 # )
-EVALUATOR_MODEL = "openrouter/owl-alpha"
+EVALUATOR_MODEL = "meta-llama/llama-3.1-8b-instruct:free"
 
 def evaluate_relevance(query:str,results:list)->dict:
     """LLM-as-judge: is at least one retrieved paper actually relevant, or is this a bad batch?"""
