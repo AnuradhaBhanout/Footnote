@@ -1,7 +1,7 @@
 {
     "mcpServers": {
         "research": {
-           "url": "http://localhost:8001/sse"
+           "url": "https://ragchatbot-research.onrender.com/sse"
         },
         "fetch": {
             "command": "uvx.exe",
