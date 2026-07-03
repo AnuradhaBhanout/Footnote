@@ -94,7 +94,9 @@ def _ensure_index_loaded():
 PAPER_DIR = "papers"
 
 # Initialize FastMCP server
-mcp = FastMCP("research", host="0.0.0.0", port=int(os.environ.get("PORT", 8001)))
+# mcp = FastMCP("research", host="0.0.0.0", port=int(os.environ.get("PORT", 8001)))
+port = int(os.environ.get("PORT") or 8001)
+mcp = FastMCP("research", host="0.0.0.0", port=port)
 # mcp = FastMCP("research")
 
 #Call LLM for dynamic search across all saved papers on disk using hybrid search architecture.
