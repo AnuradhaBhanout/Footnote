@@ -180,9 +180,13 @@ class MCP_ChatBot:
             "CRITICAL TOOL RULES:\n"
             "1. NEVER invent a tool name. Use ONLY the names listed above.\n"
             "2. For paper info use ONLY: hybrid_search_papers, search_papers, extract_info.\n"
-            "3. When you use a tool, you MUST wait for the tool output before claiming you have finished the task.\n"
-            "4. If a tool result for 'hybrid_search_papers' has 'evaluator_verdict.sufficient: false', "
+            "3. After calling search_papers, you MUST call extract_info for EACH paper_id returned.\n"
+            "4. Only after extract_info calls are complete, write your final summary.\n"
+            "5. NEVER summarize a paper without first calling extract_info on its paper_id.\n"
+            "6. When you use a tool, you MUST wait for the tool output before claiming you have finished the task.\n"
+            "7. If a tool result for 'hybrid_search_papers' has 'evaluator_verdict.sufficient: false', "
             "do NOT provide an answer. Instead, try 'search_papers' or 'fetch' to find better information.\n\n"
+            
 
             "CITATION & INTEGRITY RULES:\n"
             "- You must use the EXACT title and authors as returned by the tools.\n"
