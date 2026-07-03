@@ -370,7 +370,13 @@ class MCP_ChatBot:
             logger.info(f"Resuming graph with: {answer}")
             result = await self.app.ainvoke(Command(resume=answer),config)
 
-        self.messages = result.get("messages",self.messages)
+        all_messages = result.get("messages",self.messages)
+        # Keep only human/AI conversation turns — no tool call noise
+        self.messages = [
+            m for m in all_messages
+            if isinstance(m, (HumanMessage, AIMessage))
+            and not getattr(m, "tool_calls", None)
+        ]
         self.messages = self.messages[-20:]                  # keep last 20 messages only
 
 

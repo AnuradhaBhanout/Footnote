@@ -190,7 +190,7 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
         # Trim before passing to agent — prevents context bloat causing loops
         messages = trim_messages(
             messages,
-            max_tokens=40,
+            max_tokens=60,
             token_counter=len,
             strategy="last",
             include_system=False,
