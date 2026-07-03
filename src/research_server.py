@@ -192,10 +192,13 @@ def search_papers(topic: str, max_results: int = 5) -> List[str]:
         papers_info[paper.get_short_id()] = paper_info
     
     # Save updated papers_info to json file
-    with open(file_path, "w") as json_file:
-        json.dump(papers_info, json_file, indent=2)
-    
-    print(f"Results are saved in: {file_path}",file=sys.stderr)
+    try:
+        with open(file_path, "w") as json_file:
+            json.dump(papers_info, json_file, indent=2)
+        print(f"Results are saved in: {file_path}", file=sys.stderr)
+    except OSError:
+        print("Disk write skipped (read-only filesystem)", file=sys.stderr)
+
 
     conn = get_conn()
     with conn:

@@ -88,7 +88,7 @@ class SemanticCache:
 
     def lookup(self, query:str, current_corpus_version: str)-> dict | None:
        # print("LOOKing up for previous queries asked by the user")
-        
+        self._load()
         if not self.entries:
             return None
         
