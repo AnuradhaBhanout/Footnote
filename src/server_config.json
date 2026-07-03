@@ -6,10 +6,6 @@
         "fetch": {
             "command": "uvx.exe",
             "args": ["mcp-server-fetch"]
-        },
-        "filesystem": {
-            "command": "npx.cmd",
-            "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\anura\\AI\\Projects\\RAGchatbot\\src\\papers"]
         }
     }
 }

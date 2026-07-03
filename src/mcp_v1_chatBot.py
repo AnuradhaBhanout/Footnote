@@ -179,8 +179,9 @@ class MCP_ChatBot:
             
             "CRITICAL TOOL RULES:\n"
             "1. NEVER invent a tool name. Use ONLY the names listed above.\n"
-            "2. When you use a tool, you MUST wait for the tool output before claiming you have finished the task.\n"
-            "3. If a tool result for 'hybrid_search_papers' has 'evaluator_verdict.sufficient: false', "
+            "2. For paper info use ONLY: hybrid_search_papers, search_papers, extract_info.\n"
+            "3. When you use a tool, you MUST wait for the tool output before claiming you have finished the task.\n"
+            "4. If a tool result for 'hybrid_search_papers' has 'evaluator_verdict.sufficient: false', "
             "do NOT provide an answer. Instead, try 'search_papers' or 'fetch' to find better information.\n\n"
 
             "CITATION & INTEGRITY RULES:\n"
