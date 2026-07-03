@@ -76,6 +76,8 @@ class GraphState(TypedDict):
     citation_check_passed: bool
     citation_issues: list
     retry_count: int
+    clarification_question: Optional[str]
+    clarification_options: list
 
 def build_graph(llm,agent,cache_check_tool, cache_store_tool):
      
@@ -94,90 +96,164 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
     def after_cache(state: GraphState)-> str:
         return "end" if state["cache_hit"] else "triage_query"
     
-    async def triage_query(state: GraphState) -> GraphState:
-        logger.info("--- NODE START: triage_query ---")
+#     async def triage_query(state: GraphState) -> GraphState:
+#         logger.info("--- NODE START: triage_query ---")
             
-        messages = state.get("messages", [])
-        if len(messages) >= 2:
-            last = messages[-1]
-            second_last = messages[-2]
-            if isinstance(last, HumanMessage) and isinstance(second_last, AIMessage) and  last.content != state.get("original_query"):
-                # This is a resumed state — AI asked, human answered
-                logger.info("--- TRIAGE: Resuming, skipping LLM ---")
-                return {
-                    **state,
-                    "current_query": last.content,
-                    "retry_count": 0,
-                }
+#         messages = state.get("messages", [])
+#         if len(messages) >= 2:
+#             last = messages[-1]
+#             second_last = messages[-2]
+#             if isinstance(last, HumanMessage) and isinstance(second_last, AIMessage) and  last.content != state.get("original_query"):
+#                 # This is a resumed state — AI asked, human answered
+#                 logger.info("--- TRIAGE: Resuming, skipping LLM ---")
+#                 return {
+#                     **state,
+#                     "current_query": last.content,
+#                     "retry_count": 0,
+#                 }
             
-        if state.get("current_query"): #and state["current_query"] != state["original_query"]:
-           logger.info("--- TRIAGE: Skipping to agent (already clarified) ---")
-           return state
+#         if state.get("current_query"): #and state["current_query"] != state["original_query"]:
+#            logger.info("--- TRIAGE: Skipping to agent (already clarified) ---")
+#            return state
         
-        history = state.get("messages",[])
-       # recent_context = history[-4:] if history else []
+#         history = state.get("messages",[])
+#        # recent_context = history[-4:] if history else []
 
-        updated_messages = list(state["messages"])+ [HumanMessage(content=state["original_query"])]
+#         updated_messages = list(state["messages"])+ [HumanMessage(content=state["original_query"])]
 
-        trimmed_history = trim_messages(
-            updated_messages,
-            max_tokens=12,
-            token_counter=len,
-            strategy="last",
-            include_system=False,
-        )
+#         trimmed_history = trim_messages(
+#             updated_messages,
+#             max_tokens=12,
+#             token_counter=len,
+#             strategy="last",
+#             include_system=False,
+#         )
         
-        assessment: TriageAssessment = await triage_llm.ainvoke([SystemMessage(content=TRIAGE_SYSTEM_PROMPT)] + trimmed_history)
-        #     SystemMessage(content=TRIAGE_SYSTEM_PROMPT),
-        #     HumanMessage(content=state["original_query"]),
-        # ])
-        if assessment is None:
-            logger.warning("--- TRIAGE: LLM returned None, defaulting to clear ---")
-            return {
-                **state,
-                "messages": updated_messages,
-                "current_query": state["original_query"],
-                "retry_count": 0
-            }
+#         assessment: TriageAssessment = await triage_llm.ainvoke([SystemMessage(content=TRIAGE_SYSTEM_PROMPT)] + trimmed_history)
+#         #     SystemMessage(content=TRIAGE_SYSTEM_PROMPT),
+#         #     HumanMessage(content=state["original_query"]),
+#         # ])
+#         if assessment is None:
+#             logger.warning("--- TRIAGE: LLM returned None, defaulting to clear ---")
+#             return {
+#                 **state,
+#                 "messages": updated_messages,
+#                 "current_query": state["original_query"],
+#                 "retry_count": 0
+#             }
 
-# Implementing    HUMAN IN LOOP     ##################
-        if not assessment.is_clear:
-            logger.info(f"--- TRIAGE: Request unclear. Question: {assessment.clarifying_question}")
-            ai_question = assessment.clarifying_question or "I'm not quite sure what you mean. Could you provide more details?"
+# # Implementing    HUMAN IN LOOP     ##################
+#         if not assessment.is_clear:
+#             logger.info(f"--- TRIAGE: Request unclear. Question: {assessment.clarifying_question}")
+#             ai_question = assessment.clarifying_question or "I'm not quite sure what you mean. Could you provide more details?"
             
-            human_answer = interrupt({
-                "question": ai_question,
-                "options": assessment.possible_interpretations or [],
-            })
-            logger.info(f"--- TRIAGE: Resumed with answer: {human_answer}")
-##### HUMAN - AI - HUMAN ### Conversation flow ###
+#             human_answer = interrupt({
+#                 "question": ai_question,
+#                 "options": assessment.possible_interpretations or [],
+#             })
+#             logger.info(f"--- TRIAGE: Resumed with answer: {human_answer}")
+# ##### HUMAN - AI - HUMAN ### Conversation flow ###
             
-            updated_messages.append(AIMessage(content=ai_question))
-            updated_messages.append(HumanMessage(content=human_answer))
+#             updated_messages.append(AIMessage(content=ai_question))
+#             updated_messages.append(HumanMessage(content=human_answer))
                 
 
 
-        #     # combined query so the agent has more context
-        # if recent_context:
-        #     combined_query = (
-        #         f"Conversation so far includes a prior request about: "
-        #         f"{recent_context[0].content if recent_context else ''}. "
-        #         f"User now adds: {state['original_query']}"
-        #     )
+#         #     # combined query so the agent has more context
+#         # if recent_context:
+#         #     combined_query = (
+#         #         f"Conversation so far includes a prior request about: "
+#         #         f"{recent_context[0].content if recent_context else ''}. "
+#         #         f"User now adds: {state['original_query']}"
+#         #     )
 
 
+#             return {
+#                 **state,
+#                 "messages": updated_messages,
+#                 "current_query":human_answer,
+#                 "retry_count":0}
+        
+#         logger.info("--- TRIAGE: Request is clear. Proceeding to Agent.")
+#         return{**state,
+#                "messages": updated_messages,
+#                "current_query": state["original_query"],
+#                "retry_count":0}
+    
+
+
+    async def assess_query(state: GraphState)-> GraphState:
+        logger.info("---NODE START: assess_query---")
+
+        updated_messages = list(state["messages"]) + [HumanMessage(content=state["original_query"])]
+
+        trimmed = trim_messages(updated_messages,
+                                max_tokens=12,
+                                token_counter=len,
+                                strategy="last",
+                                include_system=False)
+        
+        assessment: TriageAssessment = await triage_llm.ainvoke(
+            [SystemMessage(content=TRIAGE_SYSTEM_PROMPT)]+trimmed
+        )
+
+        if assessment is None:
+            logger.warning("--- ASSESS: LLM returned None, defaulting to clear")
+            return{
+                **state,
+                "messages":updated_messages,
+                "current_query":state["original_query"],
+                "clarification_question":None,
+                "clarification_options":[],
+                "retry_count":0
+            }
+        
+        if not assessment.is_clear:
+            logger.info(f"--- ASSESS: Unclear. Question: {assessment.clarifying_question}")
             return {
                 **state,
                 "messages": updated_messages,
-                "current_query":human_answer,
-                "retry_count":0}
+                "clarification_question": assessment.clarifying_question or "Could you clarify?",
+                "clarification_options": assessment.possible_interpretations or [],
+                "retry_count": 0,
+            }
         
-        logger.info("--- TRIAGE: Request is clear. Proceeding to Agent.")
-        return{**state,
-               "messages": updated_messages,
-               "current_query": state["original_query"],
-               "retry_count":0}
+        logger.info("--- ASSESS: Clear. Proceeding to agent.")
+        return {**state, "messages": updated_messages, "current_query": state["original_query"],
+                "clarification_question": None, "clarification_options": [], "retry_count": 0}
+
     
+
+    async def clarify(state: GraphState)-> GraphState:
+        """ONly this re-runs on resume - no LLM call here. """
+        logger.info("--- NODE START: clarify ---")
+        ai_question = state["clarification_question"]
+
+        human_answer= interrupt({
+            "questions": ai_question,
+            "options": state["clarification_options"],
+        })
+
+        logger.info(f"--- CLARIFy: RESUMED with: {human_answer}")
+
+        updated_messages = list(state["messages"]) + [
+        AIMessage(content=ai_question),
+        HumanMessage(content=human_answer),
+        ]
+
+        return {
+            **state, 
+            "messages": updated_messages,
+            "current_query": human_answer,
+            "clarification_question": None, 
+            "clarification_options": [], 
+            "retry_count": 0
+            }
+    
+    async def after_assess(state: GraphState)-> GraphState:
+         return "clarify" if state.get("clarification_question") else "run_agent"
+
+
 
 
     async def run_agent(state: GraphState)-> GraphState:
@@ -322,8 +398,10 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
 
     graph = StateGraph(GraphState)
     graph.add_node("check_cache",check_cache)
-    graph.add_node("triage_query",triage_query)
+    #graph.add_node("triage_query",triage_query)
     graph.add_node("run_agent",run_agent)
+    graph.add_node("assess_query", assess_query)
+    graph.add_node("clarify", clarify)
     graph.add_node("check_citations",check_citations)
     graph.add_node("retry_with_feedback",retry_with_feedback)
     graph.add_node("fallback",fallback)
@@ -332,10 +410,19 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
     graph.set_entry_point("check_cache")
     graph.add_conditional_edges("check_cache",after_cache,{
         "end":END,
-        "triage_query": "triage_query"
+        "triage_query": "assess_query"
     })
-    graph.add_edge("triage_query","run_agent")
+
+    graph.add_conditional_edges("assess_query", after_assess, {
+        "clarify": "clarify",
+        "run_agent": "run_agent",
+    })
+
+    graph.add_edge("clarify", "run_agent")
+
+    #graph.add_edge("triage_query","run_agent")
     #graph.add_edge("run_agent","check_citations")
+    
     graph.add_conditional_edges(
         "check_citations", after_citation_check,{
             "finalize":"finalize",

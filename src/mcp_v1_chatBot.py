@@ -2,11 +2,11 @@ import os
 import time
 import json
 from dotenv import load_dotenv,find_dotenv
-from anthropic import Anthropic
+#from anthropic import Anthropic
 from contextlib import AsyncExitStack
 from mcp import ClientSession, StdioServerParameters, types
 
-from openai import AsyncOpenAI
+#from openai import AsyncOpenAI
 from mcp.client.stdio import stdio_client
 from mcp.client.sse import sse_client
 from typing import List,Dict,TypedDict
@@ -23,7 +23,7 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 # from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.types import Command
 from graph_pipeline import build_graph
-from langchain_ollama import ChatOllama
+#from langchain_ollama import ChatOllama
 import uuid
 import logging
 import selectors
@@ -82,6 +82,8 @@ class MCP_ChatBot:
         self.tool_to_session: Dict[str, ClientSession] = {}
 
         self.messages = []  
+        self._pg_conn = None
+        self.app = None
         
         
 
@@ -348,10 +350,11 @@ class MCP_ChatBot:
         result = await self.app.ainvoke(
             {
                 "original_query":query,
-                "original_query":query, 
                 "current_query": None,
                 "messages":self.messages,
-                "retry_count":0
+                "retry_count":0,
+                "clarification_question": None,   
+                "clarification_options": [],  
             },
             config
         )
@@ -380,7 +383,7 @@ class MCP_ChatBot:
         self.messages = self.messages[-20:]                  # keep last 20 messages only
 
 
-        final_response = result['draft_answer']
+        final_response = result.get['draft_answer']
         logger.info("Graph finished execution.")
         
         if final_response:
