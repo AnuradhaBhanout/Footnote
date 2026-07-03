@@ -7,7 +7,7 @@ import os
 from typing import List
 from mcp.server.fastmcp import FastMCP
 from semantic_cache import SemanticCache
-from langchain_ollama import ChatOllama
+
 
 from dotenv import load_dotenv,find_dotenv
 load_dotenv(find_dotenv())
@@ -34,10 +34,7 @@ _evaluator_client =OpenAI(
     base_url = "https://openrouter.ai/api/v1",
     api_key=os.getenv("OPENAI_API_KEY"),
 )
-# _relevance_judge = ChatOllama(
-#     model="llama3.1",
-#     temperature=0
-# )
+
 EVALUATOR_MODEL = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
 
 def evaluate_relevance(query:str,results:list)->dict:
