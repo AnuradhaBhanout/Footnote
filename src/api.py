@@ -20,7 +20,155 @@ from langchain_openai import ChatOpenAI
 from pydantic import BaseModel
 from dotenv import load_dotenv,find_dotenv
 
+from contextlib import asynccontextmanager
+
 load_dotenv(find_dotenv())
 
 from graph_pipeline import build_graph
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler("api_debug.log"),
+        logging.StreamHandler(),
+    ],
+)
+logger = logging.getLogger("RAG-API")
+
+#APP
+app = FastAPI(title="RAGchatbot API", version="1.0.0")
+
+# a security filter that intercepts incoming requests before they reach your endpoints
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # will tighten in production
+    allow_methods=["*"],
+    allow_headers=["*"],
+
+)
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+_app_state: dict = {}    #holds llm,agent, graph_app, pg_conn, tools
+
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+
+    from mcp_v1_chatBot import MCP_ChatBot
+
+    chatbot = MCP_ChatBot()
+    await chatbot.connect_to_server()      #connect to mcp server
+    await chatbot._build_agent_and_graph   #build agecnts + graph once at startup
+
+    _app_state["chatbot"] = chatbot
+
+    logger.info("API startup complete")
+
+    try:
+        yield  # server is now live and handles requests
+        
+    finally:
+        # no matter what if app runs normal or crashed i will shutdown the server.
+        chatbot = _app_state.get("chatbot")  
+        if chatbot:
+            await chatbot.cleanup()
+
+        logger.info("API shutdown complete.")
+
+
+
+class ChatRequest(BaseModel):
+    query: str
+    session_id: str | None = None
+
+class ResumeRequest(BaseModel):
+    session_id: str 
+    answer: str
+
+
+def sse_event(event: str,data: dict)-> str:
+
+    return f"event:{event}\ndata:{json.dumps(data)}\n\n"
+
+
+@app.post("/chat")
+async def chat(request: ChatRequest):
+    "streaming through Langgraph"
+
+    chatbot = _app_state.get("chatbot")
+    if not chatbot:
+        raise HTTPException(status_code=503, detail="Service is not ready")
+    
+    session_id = request.session_id or str(uuid.uuid4())
+    config = {"configurable":{"thread_id": session_id}}   # CHECKPOINTER
+
+    async def event_stream():
+        try:
+            async for event in chatbot.app.astream_events(
+                {
+                    "original_query": request.query,
+                    "current_query": None,
+                    "messages": [],
+                    "retry_count": 0,
+                },
+                config,
+                version="v2"
+            ):
+                kind = event["event"]
+                name = event.get("name","")
+
+                if kind == "on_tool_start":
+                    yield sse_event("tool_start",{
+                        "tool": name,
+                        "input": event.get("data", {}).get("input",{}),
+                    })
+
+                elif kind == "on_tool_end":
+                    output = event.get("data",{}).get("output","")
+
+                    if isinstance(output,str) and len(output)> 300:
+                        output = output[:300] + "..."
+
+                    yield sse_event("tool_end",{
+                        "tool": name,
+                        "output": output,
+                    })
+         
+                elif kind == "on_chat_model_stream":
+                    chunk = event.get("data",{}).get("chunk")
+                    if chunk and hasattr(chunk,"content") and chunk.content:
+                        yield sse_event("token",{"content": chunk.content})
+
+                # on graph interrupt (triage)
+                elif kind == "on_custom_event" and name == "__interrupt__":
+                    interrupt_data = event.get("data",{})
+                    yield sse_event("interrupt",{
+                        "question": interrupt_data.get("question", "Could you please specify?"),
+                        "options": interrupt_data.get("options",[]),
+                        "session_id": session_id,
+                    })
+                    return        # pause
+                
+            state = await chatbot.app.aget_state(config)
+            answer = state.values.get("draft_answer","")
+
+            yield sse_event("done",{
+                "answer": answer,
+                "session_id": session_id,
+            })
+        
+        except Exception as e:
+            logger.error(f"Stream error: {e}", exc_info=True)
+            yield sse_event("error",{"message":str(e)})
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
