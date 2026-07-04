@@ -166,9 +166,76 @@ async def chat(request: ChatRequest):
 
     return StreamingResponse(
         event_stream(),
+        media_type="text/event-stream",     #->>>> Parse and show each line the millisecond it arrives.
+        headers={
+            "Cache-Control": "no-cache",   # Hey, CDN "Do not store or save a copy of this connection, open a live connection"
+            "X-Accel-Buffering": "no",     # Hey, Nginx  push every single character to the user instantly,do not wait to make a larger block of text .
+        },
+    )
+
+
+
+@app.post("/resume")
+async def resume(request: ResumeRequest):
+
+    chatbot = _app_state.get("chatbot")
+    if not chatbot:
+        raise HTTPException(status_code=503,detail="Service not ready")
+    
+    config = {"configurable":{"thread_id":request.session_id}}
+
+    async def event_stream():
+        try:
+            async for event in chatbot.app.astream_events(
+                Command(resume=request.answer),
+                config,
+                version="v2",
+            ):
+                kind = event["event"]
+                name = event.get("name","")
+
+                if kind == "on_tool_start":
+                    yield sse_event("tool_start",{
+                        "tool":name,
+                        "input":event.get("data",{}).get("input",{}),
+                    })
+                
+                elif kind == "on_tool_end":
+                    output = event.get("data",{}).get("output","")
+                    if isinstance(output,str) and len(output)>300:
+                        output = output[:300]+"..."
+                    yield sse_event("tool_end",{
+                        "tool":name,
+                        "output":output,
+                    })
+
+                elif kind == "on_chat_model_stream":
+                    chunk = event.get("data",{}).get("chunk")
+                    if chunk and hasattr(chunk,"content") and chunk.content:
+                        yield sse_event("token",{"content":chunk.content})
+
+                    
+            state = await chatbot.app.aget_state(config)
+            answer = state.values.get("draft_answer","")
+            yield sse_event("done",{
+                "answer": answer,
+                "session_id": request.session_id,
+            })
+        
+        except Exception as e:
+            logger.error(f"Resume stream error: {e}",exc_info=True)
+            yield sse_event("error",{"message":str(e)})
+
+    return StreamingResponse(
+        event_stream(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
         },
     )
+
+@app.get("/health")
+async def health():
+    return {"status":"ok",
+            "ready":"chatbot" in _app_state}
