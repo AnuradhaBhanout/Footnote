@@ -62,7 +62,7 @@ class MCP_ChatBot:
 
        
         self.llm = ChatOpenAI(
-            model="nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", # Target a solid open-weights model
+            model="nvidia/nemotron-3-ultra-550b-a55b:free", # Target a solid open-weights model
             openai_api_base="https://openrouter.ai/api/v1",  # Connect directly to OpenRouter 
             openai_api_key=openai_key,
             max_tokens=2024
@@ -362,9 +362,14 @@ class MCP_ChatBot:
         while "__interrupt__" in result:
             logger.info("Graph Interrupted: Waiting for user clarification.")
             question_data = result["__interrupt__"][0].value
-            print(f"AI: {question_data['question']}")
-            if question_data.get("options"):
-                print("Possible meanings:", ", ".join(question_data["options"]))
+            
+            if isinstance(question_data, dict):
+                print(f"AI: {question_data.get('question', 'Could you clarify?')}")
+                if question_data.get("options"):
+                    print("Possible meanings:", ", ".join(question_data["options"]))
+            else:
+                print(f"AI: {question_data}")
+
             
             #Get human clarification
             answer = (await asyncio.to_thread(input,"\nQuery:")).strip()
@@ -383,7 +388,7 @@ class MCP_ChatBot:
         self.messages = self.messages[-20:]                  # keep last 20 messages only
 
 
-        final_response = result.get['draft_answer']
+        final_response = result.get('draft_answer')
         logger.info("Graph finished execution.")
         
         if final_response:
