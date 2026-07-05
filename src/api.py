@@ -25,12 +25,12 @@ from contextlib import asynccontextmanager
 load_dotenv(find_dotenv())
 
 from graph_pipeline import build_graph
-
+os.makedirs("logs", exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
-        logging.FileHandler("api_debug.log"),
+        logging.FileHandler("logs/api_debug.log"),
         logging.StreamHandler(),
     ],
 )

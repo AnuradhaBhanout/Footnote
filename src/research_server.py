@@ -19,10 +19,19 @@ from db import init_db,get_conn
 
 init_db()               # creates tables on first run, safe to call every time
 
+# logging.basicConfig(
+#     filename="research_server_debug.log",
+#     level=logging.INFO,
+#     format="%(asctime)s %(message)s",
+# )
+os.makedirs("logs", exist_ok=True)
 logging.basicConfig(
-    filename="research_server_debug.log",
     level=logging.INFO,
-    format="%(asctime)s %(message)s",
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.FileHandler("logs/research_server_debug.log"),
+        logging.StreamHandler() # This also prints to your terminal
+    ]
 )
 
 _hybrid_index = HybridIndex()
@@ -434,8 +443,15 @@ def store_semantic_cache(query: str, answer: str)-> dict:
 
 
 
+@mcp.custom_route("/health", methods=["GET"])
+async def health(request):
+    from starlette.responses import JSONResponse
+    return JSONResponse({"status": "ok"})
+
 
 if __name__ == "__main__":
     # Initialize and run the server
     #mcp.run(transport='stdio')
     mcp.run(transport='sse')
+
+

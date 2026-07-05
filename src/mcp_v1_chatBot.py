@@ -27,13 +27,13 @@ from graph_pipeline import build_graph
 import uuid
 import logging
 import selectors
-
+os.makedirs("logs", exist_ok=True)
 # Configure logging to write to debug.log
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
     handlers=[
-        logging.FileHandler("debug.log"),
+        logging.FileHandler("logs/debug.log"),
         logging.StreamHandler() # This also prints to your terminal
     ]
 )

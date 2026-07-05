@@ -4,18 +4,18 @@ from langgraph.types import interrupt, Command
 from langchain_core.messages import HumanMessage, SystemMessage,AIMessage,ToolMessage,trim_messages
 
 
-
+import os
 from structured_outputs import TriageAssessment #QueryReformulation
 from citation_verifier import verify_citations
 import json
 import logging
-
+os.makedirs("logs", exist_ok=True)
 # Configure logging to write to debug.log
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
     handlers=[
-        logging.FileHandler("debug.log"),
+        logging.FileHandler("logs/debug.log"),
         logging.StreamHandler() # This also prints to your terminal
     ]
 )
