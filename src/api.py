@@ -36,17 +36,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("RAG-API")
 
-#APP
-app = FastAPI(title="RAGchatbot API", version="1.0.0")
 
-# a security filter that intercepts incoming requests before they reach your endpoints
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # will tighten in production
-    allow_methods=["*"],
-    allow_headers=["*"],
-
-)
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
@@ -60,8 +50,8 @@ async def lifespan(app: FastAPI):
     from mcp_v1_chatBot import MCP_ChatBot
 
     chatbot = MCP_ChatBot()
-    await chatbot.connect_to_server()      #connect to mcp server
-    await chatbot._build_agent_and_graph   #build agecnts + graph once at startup
+    await chatbot.connect_to_servers()      #connect to mcp server
+    await chatbot._build_agent_and_graph()   #build agecnts + graph once at startup
 
     _app_state["chatbot"] = chatbot
 
@@ -77,6 +67,20 @@ async def lifespan(app: FastAPI):
             await chatbot.cleanup()
 
         logger.info("API shutdown complete.")
+
+
+
+#APP
+app = FastAPI(title="RAGchatbot API", version="1.0.0",lifespan=lifespan)
+
+# a security filter that intercepts incoming requests before they reach your endpoints
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # will tighten in production
+    allow_methods=["*"],
+    allow_headers=["*"],
+
+)
 
 
 
@@ -142,17 +146,22 @@ async def chat(request: ChatRequest):
                     if chunk and hasattr(chunk,"content") and chunk.content:
                         yield sse_event("token",{"content": chunk.content})
 
-                # on graph interrupt (triage)
-                elif kind == "on_custom_event" and name == "__interrupt__":
-                    interrupt_data = event.get("data",{})
-                    yield sse_event("interrupt",{
-                        "question": interrupt_data.get("question", "Could you please specify?"),
-                        "options": interrupt_data.get("options",[]),
-                        "session_id": session_id,
-                    })
-                    return        # pause
+                
+               
+
                 
             state = await chatbot.app.aget_state(config)
+            
+            # on graph interrupt (triage)
+            if state.next:
+                interrupt_data = state.tasks[0].interrupts[0].value
+                yield sse_event("interrupt",{
+                    "question": interrupt_data.get("question", "Could you please specify?"),
+                    "options": interrupt_data.get("options",[]),
+                    "session_id": session_id,
+                })
+                return        # pause
+            
             answer = state.values.get("draft_answer","")
 
             yield sse_event("done",{
@@ -216,6 +225,17 @@ async def resume(request: ResumeRequest):
 
                     
             state = await chatbot.app.aget_state(config)
+
+            # on graph interrupt (triage)
+            if state.next:
+                interrupt_data = state.tasks[0].interrupts[0].value
+                yield sse_event("interrupt",{
+                    "question": interrupt_data.get("question", "Could you please specify?"),
+                    "options": interrupt_data.get("options",[]),
+                    "session_id": request.session_id,
+                })
+                return        # pause
+            
             answer = state.values.get("draft_answer","")
             yield sse_event("done",{
                 "answer": answer,

@@ -230,7 +230,7 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
         ai_question = state["clarification_question"]
 
         human_answer= interrupt({
-            "questions": ai_question,
+            "question": ai_question,
             "options": state["clarification_options"],
         })
 
