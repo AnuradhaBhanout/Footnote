@@ -203,8 +203,8 @@ class MCP_ChatBot:
             )                       
         )
 
-        cache_check = next(t for t in self.available_tools if t.name == "check_semantic_cache")
-        cache_store = next(t for t in self.available_tools if t.name == "store_semantic_cache")
+        cache_check = next((t for t in self.available_tools if t.name == "check_semantic_cache"),None)
+        cache_store = next((t for t in self.available_tools if t.name == "store_semantic_cache"),None)
 
         graph = build_graph(self.llm,self.agent,cache_check,cache_store)
 
