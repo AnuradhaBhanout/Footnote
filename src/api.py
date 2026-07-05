@@ -54,6 +54,17 @@ async def lifespan(app: FastAPI):
     await chatbot._build_agent_and_graph()   #build agecnts + graph once at startup
 
     _app_state["chatbot"] = chatbot
+    
+    async def _keepalive():
+        while True:
+            await asyncio.sleep(30)
+            try:
+                session = next(iter(chatbot.sessions.values()), None)
+                if session:
+                    await session.send_ping()
+            except Exception:
+                pass
+    asyncio.create_task(_keepalive())
 
     logger.info("API startup complete")
 
@@ -67,6 +78,8 @@ async def lifespan(app: FastAPI):
             await chatbot.cleanup()
 
         logger.info("API shutdown complete.")
+
+        
 
 
 
