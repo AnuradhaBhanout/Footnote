@@ -44,7 +44,7 @@ _evaluator_client =OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
 )
 
-EVALUATOR_MODEL = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
+EVALUATOR_MODEL = "openrouter/free"
 
 def evaluate_relevance(query:str,results:list)->dict:
     """LLM-as-judge: is at least one retrieved paper actually relevant, or is this a bad batch?"""
