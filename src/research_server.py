@@ -221,9 +221,9 @@ def search_papers(topic: str, max_results: int = 5) -> List[str]:
                     info['summary'], info['pdf_url'], info['published']))
     conn.close()
     
-     #  rebuilt the index when new papers are saved
-    _ensure_index_loaded()
-    _hybrid_index.build()
+     #  rebuilt the index when new papers are saved(commented because it needs more space which does not cover under free render tier)
+    #_ensure_index_loaded()
+    #_hybrid_index.build()
     
     return paper_ids
 
