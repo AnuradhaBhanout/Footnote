@@ -85,14 +85,29 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
    # reformulate_llm = llm.with_structured_output(QueryReformulation,method="function_calling")
 
     async def check_cache(state: GraphState)-> GraphState:
-        raw = await cache_check_tool.ainvoke({"query": state["original_query"]})
-        print(f"[DEBUG raw cache result] {raw!r}")
-        result = _parse_tool_result(raw)
+        # raw = await cache_check_tool.ainvoke({"query": state["original_query"]})
+        # print(f"[DEBUG raw cache result] {raw!r}")
+        # result = _parse_tool_result(raw)
 
-        if result.get("hit"):
-            return{**state, "cache_hit":True,"draft_answer":result["answer"]}
-        return {**state,"cache_hit":False}
+        # if result.get("hit"):
+        #     return{**state, "cache_hit":True,"draft_answer":result["answer"]}
+        # return {**state,"cache_hit":False}
+    # 1. Check if the tool actually exists
+        if cache_check_tool is None:
+            logger.warning("Cache tool missing, skipping cache check.")
+            return {**state, "cache_hit": False}
+
+        try:
+            raw = await cache_check_tool.ainvoke({"query": state["original_query"]})
+            result = _parse_tool_result(raw)
+            if result.get("hit"):
+                return {**state, "cache_hit": True, "draft_answer": result["answer"]}
+        except Exception as e:
+            logger.error(f"Cache check failed: {e}")
+            
+        return {**state, "cache_hit": False}
     
+
     def after_cache(state: GraphState)-> str:
         return "end" if state["cache_hit"] else "triage_query"
     
@@ -387,12 +402,13 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
     
 
     async def finalize(state: GraphState)-> GraphState:
-        await cache_store_tool.ainvoke(
-            {
-                "query":state["original_query"],
-                "answer":state["draft_answer"]
-            }
-        )
+        if cache_store_tool is not None and state.get("draft_answer"):
+            await cache_store_tool.ainvoke(
+                {
+                    "query":state["original_query"],
+                    "answer":state["draft_answer"]
+                }
+            )
         return state
     
 
