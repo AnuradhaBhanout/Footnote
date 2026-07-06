@@ -62,7 +62,7 @@ class MCP_ChatBot:
 
        
         self.llm = ChatOpenAI(
-            model="qwen/qwen3-coder:free", # Target a solid open-weights model
+            model="liquid/lfm-2.5-1.2b-thinking:free", # Target a solid open-weights model
             openai_api_base="https://openrouter.ai/api/v1",  # Connect directly to OpenRouter 
             openai_api_key=openai_key,
             max_tokens=2024
