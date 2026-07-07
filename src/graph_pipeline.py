@@ -96,7 +96,7 @@ async def _invoke_with_retry(llm, messages):
 
 def build_graph(llm, chatbot, cache_check_tool, cache_store_tool):
      
-    triage_llm = llm.with_structured_output(TriageAssessment,method="function_calling")
+    triage_llm = llm.with_structured_output(TriageAssessment, method="json_mode")#method="function_calling")
    # reformulate_llm = llm.with_structured_output(QueryReformulation,method="function_calling")
 
     async def check_cache(state: GraphState)-> GraphState:
