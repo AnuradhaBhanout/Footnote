@@ -65,9 +65,10 @@ async def lifespan(app: FastAPI):
             except Exception:
                 pass
     #asyncio.create_task(_keepalive())
-    asyncio.create_task(chatbot.session_manager())
+    task = asyncio.create_task(chatbot.session_manager())
     await chatbot.ready_event.wait()
     _app_state["chatbot"] = chatbot
+    _app_state["session_task"] = task
 
     logger.info("API startup complete")
 
@@ -76,10 +77,19 @@ async def lifespan(app: FastAPI):
         
     finally:
         # no matter what if app runs normal or crashed i will shutdown the server.
-        chatbot = _app_state.get("chatbot")  
-        if chatbot:
-            await chatbot.cleanup()
+        # chatbot = _app_state.get("chatbot")  
+        # if chatbot:
+        #     await chatbot.cleanup()
 
+        # logger.info("API shutdown complete.")
+
+        task = _app_state.get("session_task")
+        if task:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
         logger.info("API shutdown complete.")
 
         
