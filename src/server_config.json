@@ -4,8 +4,8 @@
            "url": "https://ragchatbot-research.onrender.com/sse"
         },
         "fetch": {
-            "command": "uvx",
-            "args": ["mcp-server-fetch"]
+            "command": "uv",
+            "args": ["tool", "run","mcp-server-fetch"]
         }
     }
 }
