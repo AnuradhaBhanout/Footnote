@@ -5,6 +5,8 @@ from langchain_core.messages import HumanMessage, SystemMessage,AIMessage,ToolMe
 
 from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_exception_type
 from openai import APIError
+import anyio
+
 
 
 import os
@@ -82,7 +84,17 @@ class GraphState(TypedDict):
     clarification_question: Optional[str]
     clarification_options: list
 
-def build_graph(llm,agent,cache_check_tool, cache_store_tool):
+
+@retry(
+    retry=retry_if_exception_type(APIError),
+    wait=wait_exponential(multiplier=1, min=2, max=15),
+    stop=stop_after_attempt(3),
+)
+async def _invoke_with_retry(llm, messages):
+    return await llm.ainvoke(messages)
+
+
+def build_graph(llm, chatbot, cache_check_tool, cache_store_tool):
      
     triage_llm = llm.with_structured_output(TriageAssessment,method="function_calling")
    # reformulate_llm = llm.with_structured_output(QueryReformulation,method="function_calling")
@@ -214,13 +226,7 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
         # assessment: TriageAssessment = await triage_llm.ainvoke(
         #     [SystemMessage(content=TRIAGE_SYSTEM_PROMPT)]+trimmed
         # )
-        @retry(
-            retry=retry_if_exception_type(APIError),
-            wait=wait_exponential(multiplier=1, min=2, max=15),
-            stop=stop_after_attempt(3),
-        )
-        async def _invoke_with_retry(llm, messages):
-            return await llm.ainvoke(messages)
+
         
         assessment: TriageAssessment = await _invoke_with_retry(triage_llm,[SystemMessage(content=TRIAGE_SYSTEM_PROMPT)]+trimmed)
 
@@ -298,8 +304,13 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
             strategy="last",
             include_system=False,
         )
+        try:
+            agent_state = await chatbot.agent.ainvoke({"messages":messages},config={"recursion_limit": 25})
+        except anyio.ClosedResourceError:
+             chatbot.connect_to_servers()
+             await chatbot._rebuild_agent()
+             agent_state = await chatbot.agent.ainvoke({"messages": messages}, config={"recursion_limit": 25})
 
-        agent_state = await agent.ainvoke({"messages":messages},config={"recursion_limit": 25})
         logger.info(f"--- AGENT ACTIONS: {[m.tool_calls for m in agent_state['messages'] if hasattr(m, 'tool_calls') and m.tool_calls]} ---")
         final = agent_state["messages"][-1]
         draft = final.content if final.content else ""

@@ -65,7 +65,9 @@ class MCP_ChatBot:
             model="qwen/qwen3-coder:free", # Target a solid open-weights model
             openai_api_base="https://openrouter.ai/api/v1",  # Connect directly to OpenRouter 
             openai_api_key=openai_key,
-            max_tokens=2024
+            max_tokens=2024,
+            max_retries=1,
+            timeout=30,
         )
         # self.llm = ChatOllama(
         #     model="llama3.1",
@@ -167,10 +169,9 @@ class MCP_ChatBot:
 
       except Exception as e:
           print(f"failed to connect to {server_name}: {e}")
+     
 
-
-
-    async def _build_agent_and_graph(self):
+    async def _rebuild_agent(self):
         tool_names_str =  ", ".join([t.name for t in self.available_tools])
         self.agent = create_agent(
             model = self.llm,
@@ -203,10 +204,13 @@ class MCP_ChatBot:
             )                       
         )
 
+
+    async def _build_agent_and_graph(self):
+        await self._rebuild_agent()
         cache_check = next((t for t in self.available_tools if t.name == "check_semantic_cache"),None)
         cache_store = next((t for t in self.available_tools if t.name == "store_semantic_cache"),None)
 
-        graph = build_graph(self.llm,self.agent,cache_check,cache_store)
+        graph = build_graph(self.llm,self,cache_check,cache_store)
 
         self._pg_conn = await psycopg.AsyncConnection.connect(DATABASE_URL,autocommit=True)
         self.checkpointer = AsyncPostgresSaver(self._pg_conn)
@@ -218,6 +222,13 @@ class MCP_ChatBot:
     async def connect_to_servers(self):
 
         """Connect to all configured MCP servers."""
+        self.sessions = {}                                        #reset state
+        self.available_tools = []
+        self.available_prompts = []
+        self.tool_to_session = {}
+        await self.exit_stack.aclose()
+        self.exit_stack = AsyncExitStack()
+
         try:
           with open("server_config.json","r") as file:
             data = json.load(file)
