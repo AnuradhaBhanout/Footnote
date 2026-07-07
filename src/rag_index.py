@@ -3,10 +3,7 @@ import json
 #import pickle
 import numpy as np
 from rank_bm25 import BM25Okapi
-#from sentence_transformers import SentenceTransformer
-
-from fastembed import TextEmbedding
-import numpy as np
+from sentence_transformers import SentenceTransformer
 from psycopg2.extras import execute_values
 
 from db import get_conn 
@@ -64,11 +61,8 @@ def simple_tokenize(text: str)-> list:
     return text.lower().split()
 
 class HybridIndex:
-    # def __init__(self,model_name:str = "all-MiniLM-L6-v2"):
-    #     self.model = SentenceTransformer(model_name)
-    def __init__(self, model_name: str = "BAAI/bge-small-en-v1.5"):
-        # FastEmbed is much lighter on RAM than SentenceTransformer
-        self.model = TextEmbedding(model_name=model_name)
+    def __init__(self,model_name:str = "all-MiniLM-L6-v2"):
+        self.model = SentenceTransformer(model_name)
         self.paper_ids = []
         self.texts = []
         self.embeddings = None
@@ -86,12 +80,10 @@ class HybridIndex:
             self.bm25 = BM25Okapi([[""]])
             return
         
-        # #Dense vector - one per paper
-        # self.embeddings = self.model.encode(
-        #     self.texts,convert_to_numpy=True,normalize_embeddings=True
-        # )
-        # FastEmbed returns a generator; we convert it to a numpy array
-        self.embeddings = np.array(list(self.model.embed(self.texts)))
+        #Dense vector - one per paper
+        self.embeddings = self.model.encode(
+            self.texts,convert_to_numpy=True,normalize_embeddings=True
+        )
 
         #Sparse index - needs tokenized corpus
         tokenized_corpus = [simple_tokenize(t) for t in self.texts]
@@ -197,19 +189,15 @@ class HybridIndex:
        if not self.paper_ids:
           return[]
     
-    #    # used to generate semantic text embeddings  
-    #    query_vec = self.model.encode([query] ,convert_to_numpy=True,normalize_embeddings=True)[0] 
-
-       # FastEmbed embedding for the query
-       query_vec = list(self.model.embed([query]))[0] 
+       # used to generate semantic text embeddings  
+       query_vec = self.model.encode([query] ,convert_to_numpy=True,normalize_embeddings=True)[0]  
     
        dense_scores = self.embeddings @ query_vec   #Cosine Similarity
 
        # Cal Sparse(Keyword) score
        bm25_scores = np.array(self.bm25.get_scores(simple_tokenize(query)))
 
-       #dense_norm = self._min_max(dense_scores) # 0 or 1
-       dense_norm = self.embeddings @ query_vec
+       dense_norm = self._min_max(dense_scores) # 0 or 1
 
        bm25_norm = self._min_max(bm25_scores)   # 0 or 1
 

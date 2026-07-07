@@ -93,8 +93,7 @@ class SemanticCache:
             return None
         
         # Convert query to list of numbers
-        #query_vec = self.model.encode([query],convert_to_numpy=True, normalize_embeddings=True)[0]
-        query_vec = list(self.model.embed([query]))[0]
+        query_vec = self.model.encode([query],convert_to_numpy=True, normalize_embeddings=True)[0]
 
         best_score = -1.0
         best_entry = None
@@ -119,8 +118,7 @@ class SemanticCache:
 
     def store(self, query: str, answer: str, current_corpus_version: str) -> None:
 
-        #query_vec = self.model.encode([query],convert_to_numpy = True,normalize_embeddings = True)[0]
-        query_vec = list(self.model.embed([query]))[0]
+        query_vec = self.model.encode([query],convert_to_numpy = True,normalize_embeddings = True)[0]
 
         
         entry =     {
