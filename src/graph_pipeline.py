@@ -3,6 +3,9 @@ from langgraph.graph import StateGraph, END
 from langgraph.types import interrupt, Command
 from langchain_core.messages import HumanMessage, SystemMessage,AIMessage,ToolMessage,trim_messages
 
+from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_exception_type
+from openai import APIError
+
 
 import os
 from structured_outputs import TriageAssessment #QueryReformulation
@@ -208,9 +211,18 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
                                 strategy="last",
                                 include_system=False)
         
-        assessment: TriageAssessment = await triage_llm.ainvoke(
-            [SystemMessage(content=TRIAGE_SYSTEM_PROMPT)]+trimmed
+        # assessment: TriageAssessment = await triage_llm.ainvoke(
+        #     [SystemMessage(content=TRIAGE_SYSTEM_PROMPT)]+trimmed
+        # )
+        @retry(
+            retry=retry_if_exception_type(APIError),
+            wait=wait_exponential(multiplier=1, min=2, max=15),
+            stop=stop_after_attempt(3),
         )
+        async def _invoke_with_retry(llm, messages):
+            return await llm.ainvoke(messages)
+        
+        assessment: TriageAssessment = await _invoke_with_retry(triage_llm,[SystemMessage(content=TRIAGE_SYSTEM_PROMPT)]+trimmed)
 
         if assessment is None:
             logger.warning("--- ASSESS: LLM returned None, defaulting to clear")
