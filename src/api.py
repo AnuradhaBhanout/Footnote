@@ -146,12 +146,15 @@ async def chat(request: ChatRequest):
                 elif kind == "on_tool_end":
                     output = event.get("data",{}).get("output","")
 
-                    if isinstance(output,str) and len(output)> 300:
+                    if hasattr(output, "content"):       # ToolMessage
+                        output = output.content
+                    if isinstance(output,str):
+                        output = str(output)
+                    if len(output) > 300:
                         output = output[:300] + "..."
-
                     yield sse_event("tool_end",{
-                        "tool": name,
-                        "output": output,
+                        "tool":name,
+                        "output":output,
                     })
          
                 elif kind == "on_chat_model_stream":
@@ -224,8 +227,13 @@ async def resume(request: ResumeRequest):
                 
                 elif kind == "on_tool_end":
                     output = event.get("data",{}).get("output","")
-                    if isinstance(output,str) and len(output)>300:
-                        output = output[:300]+"..."
+
+                    if hasattr(output, "content"):       # ToolMessage
+                        output = output.content
+                    if isinstance(output,str):
+                        output = str(output)
+                    if len(output) > 300:
+                        output = output[:300] + "..."
                     yield sse_event("tool_end",{
                         "tool":name,
                         "output":output,
