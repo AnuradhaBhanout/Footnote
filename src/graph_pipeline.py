@@ -103,7 +103,7 @@ def build_graph(llm,agent,cache_check_tool, cache_store_tool):
             if result.get("hit"):
                 return {**state, "cache_hit": True, "draft_answer": result["answer"]}
         except Exception as e:
-            logger.error(f"Cache check failed: {e}")
+            logger.error(f"Cache check failed:{type(e).__name__}: {e}")
             
         return {**state, "cache_hit": False}
     

@@ -7,7 +7,7 @@ import os
 from typing import List
 from mcp.server.fastmcp import FastMCP
 from semantic_cache import SemanticCache
-
+import asyncio
 
 from dotenv import load_dotenv,find_dotenv
 load_dotenv(find_dotenv())
@@ -110,7 +110,7 @@ mcp = FastMCP("research", host="0.0.0.0", port=port)
 
 #Call LLM for dynamic search across all saved papers on disk using hybrid search architecture.
 @mcp.tool()
-def hybrid_search_papers(query: str,top_k: int = 5,alpha: float = 0.5)->List[dict]:
+async def hybrid_search_papers(query: str,top_k: int = 5,alpha: float = 0.5)->List[dict]:
     
     """
     Search ALL previously saved papers using hybrid retrieval (BM25 + embeddings),
@@ -123,11 +123,13 @@ def hybrid_search_papers(query: str,top_k: int = 5,alpha: float = 0.5)->List[dic
 
     #If this is the first search of the session, it loads the embedding model and the cached papers into memory. 
     # If it has already run, it skips the step to maintain fast response times.
-    _ensure_index_loaded()
+    #_ensure_index_loaded()
+    await asyncio.to_thread(_ensure_index_loaded)
 
     # Checks if new papers have been downloaded to your disk directory (via the standard search_papers tool) since the search index was last built. 
     # If it detects changes, it automatically regenerates the vector embeddings and updates the BM25 dictionary on-the-fly.
-    _hybrid_index.refresh_if_stale()
+    #_hybrid_index.refresh_if_stale()
+    await asyncio.to_thread(_hybrid_index.refresh_if_stale)
 
     # Executes the underlying hybrid search 
     results = _hybrid_index.search(query,top_k=top_k,alpha=alpha)
@@ -150,7 +152,7 @@ def hybrid_search_papers(query: str,top_k: int = 5,alpha: float = 0.5)->List[dic
 
 
 @mcp.tool()
-def search_papers(topic: str, max_results: int = 5) -> List[str]:
+async def search_papers(topic: str, max_results: int = 5) -> List[str]:
     """
     Search for papers on arXiv based on a topic and store their information.
     
@@ -172,7 +174,8 @@ def search_papers(topic: str, max_results: int = 5) -> List[str]:
         sort_by = arxiv.SortCriterion.Relevance
     )
 
-    papers = client.results(search)
+    #papers = client.results(search)
+    papers = await asyncio.to_thread(lambda: list(client.results(search)))
     
     # Create directory for this topic
     path = os.path.join(PAPER_DIR, topic.lower().replace(" ", "_"))
@@ -208,7 +211,10 @@ def search_papers(topic: str, max_results: int = 5) -> List[str]:
     except OSError:
         print("Disk write skipped (read-only filesystem)", file=sys.stderr)
 
+    await asyncio.to_thread(_insert_papers_sync, papers_info, topic)
+    return paper_ids
 
+def _insert_papers_sync(papers_info: dict, topic: str):
     conn = get_conn()
     with conn:
         with conn.cursor() as cur:
@@ -225,7 +231,7 @@ def search_papers(topic: str, max_results: int = 5) -> List[str]:
     #_ensure_index_loaded()
     #_hybrid_index.build()
     
-    return paper_ids
+    #return paper_ids
 
 # @mcp.tool()
 # def extract_info(paper_id: str) -> str:
@@ -257,16 +263,20 @@ def search_papers(topic: str, max_results: int = 5) -> List[str]:
 
 
 @mcp.tool()
-def extract_info(paper_id: str) -> str:
-    conn = get_conn()
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT title, authors, summary, pdf_url, published FROM papers WHERE paper_id = %s",
-            (paper_id,)
-        )
-        row = cur.fetchone()
-    conn.close()
+async def extract_info(paper_id: str) -> str:
 
+    def _fetch():
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT title, authors, summary, pdf_url, published FROM papers WHERE paper_id = %s",
+                (paper_id,)
+            )
+            row = cur.fetchone()
+        conn.close()
+        return row
+   
+    row = await asyncio.to_thread(_fetch)
     if not row:
         return f"There's no saved information related to paper {paper_id}."
 
@@ -311,12 +321,16 @@ def extract_info(paper_id: str) -> str:
 #     return content
 
 @mcp.resource("papers://folders")
-def get_available_folders() -> str:
-    conn = get_conn()
-    with conn.cursor() as cur:
-        cur.execute("SELECT DISTINCT topic FROM papers ORDER BY topic;")
-        topics = [r[0] for r in cur.fetchall()]
-    conn.close()
+async def get_available_folders() -> str:
+    def _fetchfolder():  
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute("SELECT DISTINCT topic FROM papers ORDER BY topic;")
+            topics = [r[0] for r in cur.fetchall()]
+        conn.close()
+        return topics
+    
+    topics = await asyncio.to_thread(_fetchfolder)
 
     content = "# Available Topics\n\n"
     if topics:
@@ -365,16 +379,19 @@ def get_available_folders() -> str:
 
 
 @mcp.resource("papers://{topic}")
-def get_topic_papers(topic: str) -> str:
-    conn = get_conn()
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT paper_id, title, authors, summary, pdf_url, published FROM papers WHERE topic = %s",
-            (topic.lower().replace(" ", "_"),)
-        )
-        rows = cur.fetchall()
-    conn.close()
-
+async def get_topic_papers(topic: str) -> str:
+    def _fetchpapers():
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT paper_id, title, authors, summary, pdf_url, published FROM papers WHERE topic = %s",
+                (topic.lower().replace(" ", "_"),)
+            )
+            rows = cur.fetchall()
+        conn.close()
+        return rows
+    
+    rows = await asyncio.to_thread(_fetchpapers)
     if not rows:
         return f"# No papers found for topic: {topic}\n\nTry searching for papers on this topic first."
 
@@ -420,11 +437,11 @@ Please present both detailed information about each paper and a high-level synth
 
 
 @mcp.tool()
-def check_semantic_cache(query: str) -> dict:
+async def check_semantic_cache(query: str) -> dict:
     """Check if a sufficiently similar question was already answered against the current saved papers."""
-    _ensure_index_loaded()
+    await asyncio.to_thread(_ensure_index_loaded)
     corpus_version = SemanticCache.corpus_version(_hybrid_index.paper_ids)
-    hit = _semantic_cache.lookup(query,corpus_version)
+    hit = await asyncio.to_thread(_semantic_cache.lookup, query, corpus_version)
     
     if hit:
         return{
@@ -435,10 +452,10 @@ def check_semantic_cache(query: str) -> dict:
     return{"hit":False,"answer":None}
 
 @mcp.tool()
-def store_semantic_cache(query: str, answer: str)-> dict:
+async def store_semantic_cache(query: str, answer: str)-> dict:
     """Store a verified answer in the semantic cache for furture similar questions."""
     corpus_version = SemanticCache.corpus_version(_hybrid_index.paper_ids)
-    _semantic_cache.store(query,answer,corpus_version)
+    await asyncio.to_thread(_semantic_cache.store, query, answer, corpus_version)
     return {"stored":True}
 
 
