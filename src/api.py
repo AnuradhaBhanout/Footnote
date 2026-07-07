@@ -148,7 +148,7 @@ async def chat(request: ChatRequest):
 
                     if hasattr(output, "content"):       # ToolMessage
                         output = output.content
-                    if isinstance(output,str):
+                    if not isinstance(output,str):
                         output = str(output)
                     if len(output) > 300:
                         output = output[:300] + "..."
@@ -230,7 +230,7 @@ async def resume(request: ResumeRequest):
 
                     if hasattr(output, "content"):       # ToolMessage
                         output = output.content
-                    if isinstance(output,str):
+                    if not isinstance(output,str):
                         output = str(output)
                     if len(output) > 300:
                         output = output[:300] + "..."

@@ -307,7 +307,7 @@ def build_graph(llm, chatbot, cache_check_tool, cache_store_tool):
         try:
             agent_state = await chatbot.agent.ainvoke({"messages":messages},config={"recursion_limit": 25})
         except anyio.ClosedResourceError:
-             chatbot.connect_to_servers()
+             await chatbot.connect_to_servers()
              await chatbot._rebuild_agent()
              agent_state = await chatbot.agent.ainvoke({"messages": messages}, config={"recursion_limit": 25})
 
