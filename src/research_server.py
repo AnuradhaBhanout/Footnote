@@ -44,7 +44,7 @@ _evaluator_client =OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
 )
 
-EVALUATOR_MODEL = "openrouter/free"
+EVALUATOR_MODEL = "cognitivecomputations/dolphin-mistral-24b-venice-edition:free"
 
 def evaluate_relevance(query:str,results:list)->dict:
     """LLM-as-judge: is at least one retrieved paper actually relevant, or is this a bad batch?"""
