@@ -44,7 +44,7 @@ _evaluator_client =OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
 )
 
-EVALUATOR_MODEL = "gpt-oss-20b"
+EVALUATOR_MODEL = "poolside/laguna-m.1:free"
 
 def evaluate_relevance(query:str,results:list)->dict:
     """LLM-as-judge: is at least one retrieved paper actually relevant, or is this a bad batch?"""
