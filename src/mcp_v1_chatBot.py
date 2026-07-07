@@ -86,7 +86,26 @@ class MCP_ChatBot:
         self.messages = []  
         self._pg_conn = None
         self.app = None
-        
+        self.reconnect_event = asyncio.Event()
+        self.ready_event = asyncio.Event()
+
+
+
+    async def session_manager(self):
+        await self.connect_to_servers()
+        await self._build_agent_and_graph()
+        self.ready_event.set()
+        while True:
+            await self.reconnect_event.wait()
+            self.reconnect_event.clear()
+            self.ready_event.clear()
+            try:
+                await self.connect_to_servers()
+                await self._rebuild_agent()
+            except Exception as e:
+                logger.error(f"Reconnect failed: {e}")
+            self.ready_event.set()    
+            
         
 
 

@@ -307,11 +307,9 @@ def build_graph(llm, chatbot, cache_check_tool, cache_store_tool):
         try:
             agent_state = await chatbot.agent.ainvoke({"messages":messages},config={"recursion_limit": 25})
         except anyio.ClosedResourceError:
-            logger.error("MCP session dead — cannot reconnect from request task.")
-            raise
-            #  await chatbot.connect_to_servers()
-            #  await chatbot._rebuild_agent()
-            #  agent_state = await chatbot.agent.ainvoke({"messages": messages}, config={"recursion_limit": 25})
+            chatbot.reconnect_event.set()
+            await chatbot.ready_event.wait()
+            agent_state = await chatbot.agent.ainvoke({"messages": messages}, config={"recursion_limit": 25})
 
         logger.info(f"--- AGENT ACTIONS: {[m.tool_calls for m in agent_state['messages'] if hasattr(m, 'tool_calls') and m.tool_calls]} ---")
         final = agent_state["messages"][-1]
