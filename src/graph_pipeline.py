@@ -427,12 +427,15 @@ def build_graph(llm, chatbot, cache_check_tool, cache_store_tool):
 
     async def finalize(state: GraphState)-> GraphState:
         if cache_store_tool is not None and state.get("draft_answer"):
-            await cache_store_tool.ainvoke(
-                {
-                    "query":state["original_query"],
-                    "answer":state["draft_answer"]
-                }
-            )
+            try:
+                await cache_store_tool.ainvoke(
+                    {
+                        "query":state["original_query"],
+                        "answer":state["draft_answer"]
+                    }
+                )
+            except Exception as e:
+                logger.error(f"Cache store failed (non-fatal): {e}")
         return state
     
 
