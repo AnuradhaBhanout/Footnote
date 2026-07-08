@@ -44,45 +44,70 @@ _app_state: dict = {}    #holds llm,agent, graph_app, pg_conn, tools
 
 
 
+# @asynccontextmanager
+# async def lifespan(app: FastAPI):
+
+#     from mcp_v1_chatBot import MCP_ChatBot
+
+#     chatbot = MCP_ChatBot()
+#     await chatbot.connect_to_servers()      #connect to mcp server
+#     await chatbot._build_agent_and_graph()   #build agecnts + graph once at startup
+
+#     _app_state["chatbot"] = chatbot
+    
+#     # async def _keepalive():
+#     #     while True:
+#     #         await asyncio.sleep(30)
+#     #         try:
+#     #             session = next(iter(chatbot.sessions.values()), None)
+#     #             if session:
+#     #                 await session.send_ping()
+#     #         except Exception:
+#     #             pass
+#     #asyncio.create_task(_keepalive())
+#     task = asyncio.create_task(chatbot.session_manager())
+#     await chatbot.ready_event.wait()
+#     _app_state["chatbot"] = chatbot
+#     _app_state["session_task"] = task
+
+#     logger.info("API startup complete")
+
+#     try:
+#         yield  # server is now live and handles requests
+        
+#     finally:
+#         # no matter what if app runs normal or crashed i will shutdown the server.
+#         # chatbot = _app_state.get("chatbot")  
+#         # if chatbot:
+#         #     await chatbot.cleanup()
+
+#         # logger.info("API shutdown complete.")
+
+#         task = _app_state.get("session_task")
+#         if task:
+#             task.cancel()
+#             try:
+#                 await task
+#             except asyncio.CancelledError:
+#                 pass
+#         logger.info("API shutdown complete.")
+
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-
     from mcp_v1_chatBot import MCP_ChatBot
 
     chatbot = MCP_ChatBot()
-    await chatbot.connect_to_servers()      #connect to mcp server
-    await chatbot._build_agent_and_graph()   #build agecnts + graph once at startup
-
-    #_app_state["chatbot"] = chatbot
-    
-    async def _keepalive():
-        while True:
-            await asyncio.sleep(30)
-            try:
-                session = next(iter(chatbot.sessions.values()), None)
-                if session:
-                    await session.send_ping()
-            except Exception:
-                pass
-    #asyncio.create_task(_keepalive())
     task = asyncio.create_task(chatbot.session_manager())
-    await chatbot.ready_event.wait()
     _app_state["chatbot"] = chatbot
     _app_state["session_task"] = task
 
-    logger.info("API startup complete")
+    logger.info("API startup complete (connecting in background)")
 
     try:
-        yield  # server is now live and handles requests
-        
+        yield
     finally:
-        # no matter what if app runs normal or crashed i will shutdown the server.
-        # chatbot = _app_state.get("chatbot")  
-        # if chatbot:
-        #     await chatbot.cleanup()
-
-        # logger.info("API shutdown complete.")
-
         task = _app_state.get("session_task")
         if task:
             task.cancel()
@@ -129,7 +154,7 @@ async def chat(request: ChatRequest):
     "streaming through Langgraph"
 
     chatbot = _app_state.get("chatbot")
-    if not chatbot:
+    if not chatbot or not chatbot.ready_event.is_set():
         raise HTTPException(status_code=503, detail="Service is not ready")
     
     session_id = request.session_id or str(uuid.uuid4())
