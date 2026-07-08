@@ -6,6 +6,7 @@ from langchain_core.messages import HumanMessage, SystemMessage,AIMessage,ToolMe
 from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_exception_type
 from openai import APIError
 import anyio
+from mcp.shared.exceptions import McpError
 
 
 
@@ -306,7 +307,7 @@ def build_graph(llm, chatbot, cache_check_tool, cache_store_tool):
         )
         try:
             agent_state = await chatbot.agent.ainvoke({"messages":messages},config={"recursion_limit": 25})
-        except anyio.ClosedResourceError:
+        except (anyio.ClosedResourceError,McpError):
             chatbot.reconnect_event.set()
             await chatbot.ready_event.wait()
             agent_state = await chatbot.agent.ainvoke({"messages": messages}, config={"recursion_limit": 25})
