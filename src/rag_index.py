@@ -82,7 +82,7 @@ class HybridIndex:
         
         #Dense vector - one per paper
         self.embeddings = self.model.encode(
-            self.texts,convert_to_numpy=True,normalize_embeddings=True
+            self.texts,convert_to_numpy=True,normalize_embeddings=True,batch_size=8, show_progress_bar=False
         )
 
         #Sparse index - needs tokenized corpus

@@ -163,7 +163,7 @@ async def search_papers(topic: str, max_results: int = 5) -> List[str]:
     Returns:
         List of paper IDs found in the search
     """
-    
+    max_results = min(max_results, 10)
     # Use arxiv to find the papers 
     client = arxiv.Client()
 
