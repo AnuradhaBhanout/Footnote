@@ -11,7 +11,7 @@ from mcp.shared.exceptions import McpError
 
 
 import os
-from structured_outputs import TriageAssessment #QueryReformulation
+#from structured_outputs import TriageAssessment #QueryReformulation
 from citation_verifier import verify_citations
 import json
 import logging
@@ -31,24 +31,25 @@ MAX_RETRIES = 2
 
 ACTION_TOOL_NAMES = {"write_file","edit_file","create_directory","move_file","fetch"}
 
-TRIAGE_SYSTEM_PROMPT = r"""
-You are a triage assistant for a research helper tool used by everyday\people, not 
-just technical experts. Your only job: decide if the user;s request is specific\
-enough to act on right away, or if it's ambigious and needs a quick clarifying question
-first.
+# #optimization
+# TRIAGE_SYSTEM_PROMPT = r"""
+# You are a triage assistant for a research helper tool used by everyday\people, not 
+# just technical experts. Your only job: decide if the user;s request is specific\
+# enough to act on right away, or if it's ambigious and needs a quick clarifying question
+# first.
 
-A request is UNCLEAR if any of these are true:
-- It uses a short term,name,or abbrivation that could plausibly mean more than one real thing.
-- It refers to "the paper," "that one," "this," or similar without saying which one, when more
-than one thing could be meant.
-- It's too broad or vauge to search well(a single very general word covering many unrelated sub-topics).
-- It's missing a detail that would clearly change the answer or action (e.g. asking to save something without saying what or where).
+# A request is UNCLEAR if any of these are true:
+# - It uses a short term,name,or abbrivation that could plausibly mean more than one real thing.
+# - It refers to "the paper," "that one," "this," or similar without saying which one, when more
+# than one thing could be meant.
+# - It's too broad or vauge to search well(a single very general word covering many unrelated sub-topics).
+# - It's missing a detail that would clearly change the answer or action (e.g. asking to save something without saying what or where).
 
-A request is CLEAR if it names a specific-enough topic or action that a reasonable a person could act on without guessing.
+# A request is CLEAR if it names a specific-enough topic or action that a reasonable a person could act on without guessing.
 
-Write any carifiying question in plain, friendly language - do not assume the user knows technical jargon or this system's internal terms.
+# Write any carifiying question in plain, friendly language - do not assume the user knows technical jargon or this system's internal terms.
 
-"""
+# """
 
 
 def _parse_tool_result(result) -> dict:
@@ -96,8 +97,8 @@ async def _invoke_with_retry(llm, messages):
 
 
 def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
-     
-    triage_llm = llm.with_structured_output(TriageAssessment,method="function_calling")
+#optimization    
+    #triage_llm = llm.with_structured_output(TriageAssessment,method="function_calling")
    # reformulate_llm = llm.with_structured_output(QueryReformulation,method="function_calling")
 
     async def check_cache(state: GraphState)-> GraphState:
@@ -206,49 +207,49 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
 #                "retry_count":0}
     
 
+# #optimization
+#     async def assess_query(state: GraphState)-> GraphState:
+#         logger.info("---NODE START: assess_query---")
 
-    async def assess_query(state: GraphState)-> GraphState:
-        logger.info("---NODE START: assess_query---")
+#         updated_messages = list(state["messages"]) + [HumanMessage(content=state["original_query"])]
 
-        updated_messages = list(state["messages"]) + [HumanMessage(content=state["original_query"])]
-
-        trimmed = trim_messages(updated_messages,
-                                max_tokens=12,
-                                token_counter=len,
-                                strategy="last",
-                                include_system=False)
+#         trimmed = trim_messages(updated_messages,
+#                                 max_tokens=12,
+#                                 token_counter=len,
+#                                 strategy="last",
+#                                 include_system=False)
         
-        # assessment: TriageAssessment = await triage_llm.ainvoke(
-        #     [SystemMessage(content=TRIAGE_SYSTEM_PROMPT)]+trimmed
-        # )
+#         # assessment: TriageAssessment = await triage_llm.ainvoke(
+#         #     [SystemMessage(content=TRIAGE_SYSTEM_PROMPT)]+trimmed
+#         # )
 
         
-        assessment: TriageAssessment = await _invoke_with_retry(triage_llm,[SystemMessage(content=TRIAGE_SYSTEM_PROMPT)]+trimmed)
+#         assessment: TriageAssessment = await _invoke_with_retry(triage_llm,[SystemMessage(content=TRIAGE_SYSTEM_PROMPT)]+trimmed)
 
-        if assessment is None:
-            logger.warning("--- ASSESS: LLM returned None, defaulting to clear")
-            return{
-                **state,
-                "messages":updated_messages,
-                "current_query":state["original_query"],
-                "clarification_question":None,
-                "clarification_options":[],
-                "retry_count":0
-            }
+#         if assessment is None:
+#             logger.warning("--- ASSESS: LLM returned None, defaulting to clear")
+#             return{
+#                 **state,
+#                 "messages":updated_messages,
+#                 "current_query":state["original_query"],
+#                 "clarification_question":None,
+#                 "clarification_options":[],
+#                 "retry_count":0
+#             }
         
-        if not assessment.is_clear:
-            logger.info(f"--- ASSESS: Unclear. Question: {assessment.clarifying_question}")
-            return {
-                **state,
-                "messages": updated_messages,
-                "clarification_question": assessment.clarifying_question or "Could you clarify?",
-                "clarification_options": assessment.possible_interpretations or [],
-                "retry_count": 0,
-            }
+#         if not assessment.is_clear:
+#             logger.info(f"--- ASSESS: Unclear. Question: {assessment.clarifying_question}")
+#             return {
+#                 **state,
+#                 "messages": updated_messages,
+#                 "clarification_question": assessment.clarifying_question or "Could you clarify?",
+#                 "clarification_options": assessment.possible_interpretations or [],
+#                 "retry_count": 0,
+#             }
         
-        logger.info("--- ASSESS: Clear. Proceeding to agent.")
-        return {**state, "messages": updated_messages, "current_query": state["original_query"],
-                "clarification_question": None, "clarification_options": [], "retry_count": 0}
+#         logger.info("--- ASSESS: Clear. Proceeding to agent.")
+#         return {**state, "messages": updated_messages, "current_query": state["original_query"],
+#                 "clarification_question": None, "clarification_options": [], "retry_count": 0}
 
     
 
@@ -277,9 +278,10 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
             "clarification_options": [], 
             "retry_count": 0
             }
-    
-    async def after_assess(state: GraphState)-> GraphState:
-         return "clarify" if state.get("clarification_question") else "run_agent"
+
+# #optimization  
+#     async def after_assess(state: GraphState)-> GraphState:
+#          return "clarify" if state.get("clarification_question") else "run_agent"
 
 
 
@@ -328,8 +330,26 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
             else:
                 raise
             
-
+#optimization ( check if the agent asked for clarification instead of searching )
+        agent_messages = agent_state["messages"]
         logger.info(f"--- AGENT ACTIONS: {[m.tool_calls for m in agent_state['messages'] if hasattr(m, 'tool_calls') and m.tool_calls]} ---")
+
+        last_ai = next((m for m in reversed(agent_messages) if isinstance(m,AIMessage)and getattr(m,"tool_calls",None)),None)
+
+        if last_ai:
+            clarify_call = next((tc for tc in last_ai.tool_calls if tc["name"] == "ask_clarification"),None)
+            if clarify_call:
+                args = clarify_call.get("args",{})
+                logger.info(f"----RUN_AGENT: Agent requested clarification: {args.get('question')}")
+                return{
+                    **state,
+                    "messages": agent_messages,
+                    "clarification_question":args.get("question","Could you clarify?"),
+                    "clarification_options":args.get("options",[]),
+                }
+
+
+
         final = agent_state["messages"][-1]
         draft = final.content if final.content else ""
         logger.info("--- NODE END: run_agent completed ---")
@@ -363,6 +383,8 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
             **state,
             "messages":agent_state["messages"],
             "draft_answer": draft,
+            "clarification_question": None,
+            "clarification_options": [],
             "retry_count": new_retry_count
                 }
     
@@ -399,7 +421,12 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
         return "ok"
     
 
-    
+    def after_run_agent(state: GraphState)-> str:   
+        if state.get("clarification_question"):
+            return "clarify"
+        return should_continue_searching(state)
+
+
     def check_citations(state: GraphState)-> GraphState:
         result = verify_citations(state["draft_answer"],state["messages"])
         return {**state,"citation_check_passed":result["passed"], "citation_issues":result["issues"]}
@@ -462,7 +489,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
     graph.add_node("check_cache",check_cache)
     #graph.add_node("triage_query",triage_query)
     graph.add_node("run_agent",run_agent)
-    graph.add_node("assess_query", assess_query)
+    #graph.add_node("assess_query", assess_query)
     graph.add_node("clarify", clarify)
     graph.add_node("check_citations",check_citations)
     graph.add_node("retry_with_feedback",retry_with_feedback)
@@ -472,12 +499,19 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
     graph.set_entry_point("check_cache")
     graph.add_conditional_edges("check_cache",after_cache,{
         "end":END,
-        "triage_query": "assess_query"
+        "triage_query": "run_agent"
     })
 
-    graph.add_conditional_edges("assess_query", after_assess, {
-        "clarify": "clarify",
-        "run_agent": "run_agent",
+    # graph.add_conditional_edges("assess_query", after_assess, {
+    #     "clarify": "clarify",
+    #     "run_agent": "run_agent",
+    # })
+
+    #optimization
+    graph.add_conditional_edges("run_agent",after_run_agent,{
+        "clarify":"clarify",
+        "retry":"run_agent",
+        "ok":"check_citations",
     })
 
     graph.add_edge("clarify", "run_agent")
@@ -494,14 +528,14 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
         }
     )
 
-    graph.add_conditional_edges(
-        "run_agent",
-        should_continue_searching,
-        {
-            "retry": "run_agent",      # Loop back to agent for a better search
-            "ok": "check_citations"     # Proceed normally
-        }
-    )
+    # graph.add_conditional_edges(
+    #     "run_agent",
+    #     should_continue_searching,
+    #     {
+    #         "retry": "run_agent",      # Loop back to agent for a better search
+    #         "ok": "check_citations"     # Proceed normally
+    #     }
+    # )
 
     graph.add_edge("retry_with_feedback","run_agent")
     graph.add_edge("finalize",END)
