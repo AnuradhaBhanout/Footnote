@@ -17,6 +17,7 @@ nest_asyncio.apply()
 
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage,AIMessage,ToolMessage
+from langchain_core.tools import tool
 from langchain.agents import create_agent
 import psycopg
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -46,11 +47,17 @@ _ = load_dotenv(find_dotenv())
 openai_key = os.getenv("OPENAI_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# class ToolDefinition(TypedDict):
-#     name: str
-#     description: str
-#     input_schema: dict
+@tool
+def ask_clarification(question:str,options: list[str] = [])-> str:
+    """Call this INSTEAD of any search  tool when the user's request is ambiguous,
+       uses an unclear abbreviation/name, or is missing a detail needed  to act.
+       Do NOT call this together with any other tool in the same turn.
+       Args:
+          questions: A plain-language clarifying question for the user.
+          options: 2-4 short possible interpretations to help the user answer quickly.
 
+    """
+    return "CLARIFICATION_REQUESTED"
 
 class MCP_ChatBot:
 
