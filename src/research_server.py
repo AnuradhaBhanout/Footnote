@@ -40,11 +40,11 @@ _index_loaded = False
 _semantic_cache = SemanticCache(model=_hybrid_index.model) # reuse the loaded model
 
 _evaluator_client =OpenAI(
-    base_url = "https://openrouter.ai/api/v1",
-    api_key=os.getenv("OPENAI_API_KEY"),
+    base_url = "https://api.groq.com/openai/v1",
+    api_key=os.getenv("GROQ_API_KEY"),
 )
 
-EVALUATOR_MODEL = "openrouter/free"
+EVALUATOR_MODEL = "openai/gpt-oss-120b"
 
 def evaluate_relevance(query:str,results:list)->dict:
     """LLM-as-judge: is at least one retrieved paper actually relevant, or is this a bad batch?"""
@@ -184,10 +184,21 @@ async def search_papers(topic: str, max_results: int = 5) -> List[str]:
     file_path = os.path.join(path, "papers_info.json")
 
     # Try to load existing papers info
+    # try:
+    #     with open(file_path, "r") as json_file:
+    #         papers_info = json.load(json_file)
+    # except (FileNotFoundError, json.JSONDecodeError):
+    #     papers_info = {}
+
+    papers_info = {}
     try:
-        with open(file_path, "r") as json_file:
-            papers_info = json.load(json_file)
-    except (FileNotFoundError, json.JSONDecodeError):
+        with open(file_path, "r") as f:
+            for line in f:
+                if line.strip():
+                    record = json.loads(line)
+                    # Assuming you write { "paper_id": { ... } } or similar structure
+                    papers_info.update(record)
+    except FileNotFoundError:
         papers_info = {}
 
     # Process each paper and add to papers_info  
@@ -205,14 +216,19 @@ async def search_papers(topic: str, max_results: int = 5) -> List[str]:
     
     # Save updated papers_info to json file
     try:
+        # with open(file_path, "w") as json_file:
+        #     json.dump(papers_info, json_file, indent=2)
+        # print(f"Results are saved in: {file_path}", file=sys.stderr)
         with open(file_path, "w") as json_file:
-            json.dump(papers_info, json_file, indent=2)
-        print(f"Results are saved in: {file_path}", file=sys.stderr)
+           for pid, info in papers_info.items():
+               json_file.write(json.dumps({pid: info}) + "\n")
     except OSError:
         print("Disk write skipped (read-only filesystem)", file=sys.stderr)
 
     await asyncio.to_thread(_insert_papers_sync, papers_info, topic)
     return paper_ids
+
+
 
 def _insert_papers_sync(papers_info: dict, topic: str):
     conn = get_conn()
