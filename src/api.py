@@ -165,7 +165,7 @@ async def chat(request: ChatRequest):
             async for event in chatbot.app.astream_events(
                 {
                     "original_query": request.query,
-                    "current_query": None,
+                    "current_query": request.query,
                     "messages": [],
                     "retry_count": 0,
                 },
