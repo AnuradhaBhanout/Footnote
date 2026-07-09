@@ -232,12 +232,16 @@ class MCP_ChatBot:
         tool_names_str =  ", ".join([t.name for t in self.available_tools])
         self.agent = create_agent(
             model = self.llm,
-            tools=self.available_tools,
+            tools=self.available_tools + [ask_clarification],
 
             system_prompt=(
-            f"SYSTEM ROLE: You are an expert Research Assistant with access to these specific tools: [{tool_names_str}].\n\n"
-            
+            f"SYSTEM ROLE: You are an expert Research Assistant with access to these specific tools: [{tool_names_str}, ask_clarification].\n\n"
+
             "CRITICAL TOOL RULES:\n"
+            "0. FIRST, judge if the request is clear enough to act on. If it uses a short/ambiguous "
+            "term, refers to 'that paper' or similar without specifying which, or is missing a needed "
+            "detail — call ask_clarification with a plain-language question and 2-4 short options. "
+            "Do NOT call any other tool in the same turn if you call ask_clarification.\n"
             "1. NEVER invent a tool name. Use ONLY the names listed above.\n"
             "2. For paper info use ONLY: hybrid_search_papers, search_papers, extract_info.\n"
             "3. After calling search_papers, you MUST call extract_info for EACH paper_id returned.\n"
@@ -245,8 +249,7 @@ class MCP_ChatBot:
             "5. NEVER summarize a paper without first calling extract_info on its paper_id.\n"
             "6. When you use a tool, you MUST wait for the tool output before claiming you have finished the task.\n"
             "7. If a tool result for 'hybrid_search_papers' has 'evaluator_verdict.sufficient: false', "
-            "do NOT provide an answer. Instead, try 'search_papers' with different terms to find better information.\n\n"
-            
+            "do NOT provide an answer. Instead, try 'search_papers' with different terms.\n\n"
 
             "CITATION & INTEGRITY RULES:\n"
             "- You must use the EXACT title and authors as returned by the tools.\n"
@@ -254,10 +257,8 @@ class MCP_ChatBot:
             "- If a paper is not relevant to the query, EXCLUDE it entirely.\n\n"
 
             "OUTPUT FORMAT:\n"
-            "After all tool calls are complete, provide a friendly, plain-language summary of your findings. "
-            "Provide ONLY the final answer."
-            "Do NOT include your reasoning, planning, or internal thoughts. "
-            "If citations are used, list them clearly."
+            "After all tool calls are complete, provide a friendly, plain-language summary. "
+            "Provide ONLY the final answer. Do NOT include reasoning or internal thoughts."
             )                       
         )
 
