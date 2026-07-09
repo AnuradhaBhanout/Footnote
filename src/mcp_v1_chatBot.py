@@ -117,7 +117,8 @@ class MCP_ChatBot:
                 self.reconnect_event.clear()
                 self.ready_event.clear()
                 try:
-                    await self.connect_to_servers()
+                    #await self.connect_to_servers()
+                    await self._connect_with_retry()
                     await self._rebuild_agent()
                 except Exception as e:
                     logger.error(f"Reconnect failed: {e}")
@@ -175,16 +176,16 @@ class MCP_ChatBot:
             # list of available tools for this session
             response = await session.list_tools()
             tools = response.tools
-            for tool in tools:
+            for tool_ in tools:
                 #self.tool_to_session[tool.name] = session
-                self.sessions[tool.name] = session
+                self.sessions[tool_.name] = session
 
             raw_langchain_tools = [
-                            convert_mcp_tool_to_langchain_tool(session, tool) for tool in response.tools
+                            convert_mcp_tool_to_langchain_tool(session, tool_) for tool_ in response.tools
                         ]
-            for tool in raw_langchain_tools:
-             if hasattr(tool, "args_schema") and tool.args_schema:
-               schema = tool.args_schema
+            for lc_tool in raw_langchain_tools:
+             if hasattr(lc_tool, "args_schema") and lc_tool.args_schema:
+               schema = lc_tool.args_schema
                if isinstance(schema, dict):
                    schema_dict = schema
                elif hasattr(schema, "model_dump"):
@@ -196,15 +197,14 @@ class MCP_ChatBot:
                   for prop in schema_dict.get("properties", {}).values():
                       if isinstance(prop, dict):
                          prop.pop("title", None)
-                  tool.args_schema = schema_dict
+                  lc_tool.args_schema = schema_dict
 
-               tool.description = (tool.description or "").strip()
+               lc_tool.description = (lc_tool.description or "").strip()
 
-             self.available_tools.append(tool)
-            for tool in self.available_tools:
-                 logger.info(f"[SCHEMA] {tool.name}: {tool.args_schema}")
+             self.available_tools.append(lc_tool)
+             logger.info(f"[SCHEMA DUMP] " + "; ".join(f"{t.name}: {getattr(t, 'args_schema', None)}" for t in self.available_tools))
 
-            print("\nConnected to server with tools:", [tool.name for tool in self.available_tools])
+            print("\nConnected to server with tools:", [t.name for t in self.available_tools])
                 
             # List available prompts
             prompts_response = await session.list_prompts()
@@ -576,7 +576,8 @@ async def main():
     chatbot = MCP_ChatBot()
     try:
         t0 = time.time()
-        await chatbot.connect_to_servers() 
+        #await chatbot.connect_to_servers() 
+        await chatbot._connect_with_retry()
         print(f"[timing] server connection took {time.time() - t0:.2f}s")
         await chatbot._build_agent_and_graph()
         await chatbot.chat_loop()
