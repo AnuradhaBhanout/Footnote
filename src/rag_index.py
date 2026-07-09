@@ -3,8 +3,9 @@ import json
 #import pickle
 import numpy as np
 from rank_bm25 import BM25Okapi
-from sentence_transformers import SentenceTransformer
+#from sentence_transformers import SentenceTransformer
 from psycopg2.extras import execute_values
+from embedding_model import EmbeddingModel
 
 from db import get_conn 
 
@@ -33,21 +34,28 @@ PAPER_DIR = "papers"
 
 def load_all_papers() -> dict:
     conn = get_conn()
-    with conn.cursor() as cur:
-        cur.execute("SELECT paper_id, title, authors, summary, pdf_url, published FROM papers;")
-        rows = cur.fetchall()
-    conn.close()
+    papers = {}
     
-    return {
-        r[0]: {
-            "title": r[1],
-            "authors": r[2],
-            "summary": r[3],
-            "pdf_url": r[4],
-            "published": r[5],
-        }
-        for r in rows
-    }
+    # 1. 'with conn:' establishes the transaction block required by server-side cursors
+    with conn: 
+        with conn.cursor(name="stream_papers_cursor") as cur:
+            # 2. Set batch size for streaming network requests
+            cur.itersize = 2000 
+            cur.execute("SELECT paper_id, title, authors, summary, pdf_url, published FROM papers;")
+            
+            # 3. Stream each row line-by-line instead of using .fetchall()
+            for r in cur:
+                papers[r[0]] = {
+                    "title": r[1],
+                    "authors": r[2],
+                    "summary": r[3],
+                    "pdf_url": r[4],
+                    "published": r[5],
+                }
+    conn.close()
+    return papers
+
+
 
 # Turn paper into text text chunks
 def paper_to_text(paper_info:dict)-> str:
@@ -61,8 +69,8 @@ def simple_tokenize(text: str)-> list:
     return text.lower().split()
 
 class HybridIndex:
-    def __init__(self,model_name:str = "all-MiniLM-L6-v2"):
-        self.model = SentenceTransformer(model_name)
+    def __init__(self,model_name:str = "sentence-transformers/all-MiniLM-L6-v2"):
+        self.model = EmbeddingModel(model_name=model_name)
         self.paper_ids = []
         self.texts = []
         self.embeddings = None
@@ -84,6 +92,8 @@ class HybridIndex:
         self.embeddings = self.model.encode(
             self.texts,convert_to_numpy=True,normalize_embeddings=True,batch_size=8, show_progress_bar=False
         )
+
+        #self.embeddings = np.array(list(self.model.embed(self.texts)))
 
         #Sparse index - needs tokenized corpus
         tokenized_corpus = [simple_tokenize(t) for t in self.texts]
@@ -191,6 +201,7 @@ class HybridIndex:
     
        # used to generate semantic text embeddings  
        query_vec = self.model.encode([query] ,convert_to_numpy=True,normalize_embeddings=True)[0]  
+       #query_vec = list(self.model.embed([query]))[0]
     
        dense_scores = self.embeddings @ query_vec   #Cosine Similarity
 
