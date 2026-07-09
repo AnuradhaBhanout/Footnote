@@ -61,13 +61,22 @@ class MCP_ChatBot:
         self.thread_id = str(uuid.uuid4()) 
 
        
+        # self.llm = ChatOpenAI(
+        #     model="nvidia/nemotron-3-ultra-550b-a55b:free", # Target a solid open-weights model
+        #     openai_api_base="https://openrouter.ai/api/v1",  # Connect directly to OpenRouter 
+        #     openai_api_key=openai_key,
+        #     max_tokens=2024,
+        #     max_retries=1,
+        #     timeout=30,
+        # )
         self.llm = ChatOpenAI(
-            model="openrouter/free", # Target a solid open-weights model
-            openai_api_base="https://openrouter.ai/api/v1",  # Connect directly to OpenRouter 
-            openai_api_key=openai_key,
+            model="openai/gpt-oss-120b",
+            openai_api_base="https://api.groq.com/openai/v1",
+            openai_api_key=os.getenv("GROQ_API_KEY"),
             max_tokens=2024,
             max_retries=1,
             timeout=30,
+            model_kwargs={"parallel_tool_calls": False},
         )
         # self.llm = ChatOllama(
         #     model="llama3.1",
@@ -112,7 +121,20 @@ class MCP_ChatBot:
                 await self._pg_conn.close()
             raise 
             
-        
+    async def _connect_with_retry(self,attempts: int = 4, delay: float=3.0):
+        last_err = None
+        for i in range(attempts):
+            try:
+                await self.connect_to_servers()
+                if self.available_tools:
+                    return
+                last_err = RuntimeError("connected but zero tool registered")
+
+            except Exception as e:
+                last_err = e
+            logger.warning(f"connection attempt{i+1}/{attempts} failed: {last_err}. Retrying in {delay}s")
+            await asyncio.sleep(delay)
+        raise last_err
 
 
 
@@ -172,6 +194,8 @@ class MCP_ChatBot:
                tool.description = (tool.description or "").strip()
 
              self.available_tools.append(tool)
+            for tool in self.available_tools:
+                 logger.info(f"[SCHEMA] {tool.name}: {tool.args_schema}")
 
             print("\nConnected to server with tools:", [tool.name for tool in self.available_tools])
                 
@@ -194,6 +218,7 @@ class MCP_ChatBot:
 
       except Exception as e:
           print(f"failed to connect to {server_name}: {e}")
+          raise
      
 
     async def _rebuild_agent(self):
@@ -213,7 +238,7 @@ class MCP_ChatBot:
             "5. NEVER summarize a paper without first calling extract_info on its paper_id.\n"
             "6. When you use a tool, you MUST wait for the tool output before claiming you have finished the task.\n"
             "7. If a tool result for 'hybrid_search_papers' has 'evaluator_verdict.sufficient: false', "
-            "do NOT provide an answer. Instead, try 'search_papers' or 'fetch' to find better information.\n\n"
+            "do NOT provide an answer. Instead, try 'search_papers' with different terms to find better information.\n\n"
             
 
             "CITATION & INTEGRITY RULES:\n"
@@ -232,10 +257,10 @@ class MCP_ChatBot:
 
     async def _build_agent_and_graph(self):
         await self._rebuild_agent()
-        cache_check = next((t for t in self.available_tools if t.name == "check_semantic_cache"),None)
-        cache_store = next((t for t in self.available_tools if t.name == "store_semantic_cache"),None)
+        #cache_check = next((t for t in self.available_tools if t.name == "check_semantic_cache"),None)
+        #cache_store = next((t for t in self.available_tools if t.name == "store_semantic_cache"),None)
 
-        graph = build_graph(self.llm,self,cache_check,cache_store)
+        graph = build_graph(self.llm,self)#,cache_check,cache_store)
 
         self._pg_conn = await psycopg.AsyncConnection.connect(DATABASE_URL,autocommit=True)
         self.checkpointer = AsyncPostgresSaver(self._pg_conn)
