@@ -95,19 +95,13 @@ async def _invoke_with_retry(llm, messages):
     return await llm.ainvoke(messages)
 
 
-def build_graph(llm, chatbot, cache_check_tool, cache_store_tool):
+def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
      
     triage_llm = llm.with_structured_output(TriageAssessment,method="function_calling")
    # reformulate_llm = llm.with_structured_output(QueryReformulation,method="function_calling")
 
     async def check_cache(state: GraphState)-> GraphState:
-        # raw = await cache_check_tool.ainvoke({"query": state["original_query"]})
-        # print(f"[DEBUG raw cache result] {raw!r}")
-        # result = _parse_tool_result(raw)
-
-        # if result.get("hit"):
-        #     return{**state, "cache_hit":True,"draft_answer":result["answer"]}
-        # return {**state,"cache_hit":False}
+        cache_check_tool = next((t for t in chatbot.available_tools if t.name == "check_semantic_cache"), None)
     # 1. Check if the tool actually exists
         if cache_check_tool is None:
             logger.warning("Cache tool missing, skipping cache check.")
@@ -308,9 +302,32 @@ def build_graph(llm, chatbot, cache_check_tool, cache_store_tool):
         try:
             agent_state = await chatbot.agent.ainvoke({"messages":messages},config={"recursion_limit": 25})
         except (anyio.ClosedResourceError,McpError):
-            chatbot.reconnect_event.set()
-            await chatbot.ready_event.wait()
-            agent_state = await chatbot.agent.ainvoke({"messages": messages}, config={"recursion_limit": 25})
+            for attempt in range(2):
+                chatbot.reconnect_event.set()
+                await chatbot.ready_event.wait()
+                try:
+                    agent_state = await chatbot.agent.ainvoke({"messages": messages}, config={"recursion_limit": 25})
+                    break
+                except (anyio.ClosedResourceError,McpError)as e:
+                    if attempt == 1:
+                        logger.error(f"run_agent: reconnect retries exhausted: {e}")
+                        return {
+                            **state,
+                            "draft_answer": "The research service is temporarily unavailable — please try again in a moment.",
+                            "retry_count": state["retry_count"] + 1,
+                        }
+                    
+        except APIError as e:
+            if "tool call validation failed" in str(e) or "Failed to call a function" in str(e):
+                logger.warning(f"Malformed tool call, retrying once: {e}")
+                try:
+                    agent_state = await chatbot.agent.ainvoke({"messages": messages}, config={"recursion_limit": 25})
+                except APIError as e2:
+                    logger.error(f"run_agent: retry also failed: {e2}")
+                    return {**state, "draft_answer": "I had trouble processing that — could you try rephrasing?", "retry_count": state["retry_count"] + 1}
+            else:
+                raise
+            
 
         logger.info(f"--- AGENT ACTIONS: {[m.tool_calls for m in agent_state['messages'] if hasattr(m, 'tool_calls') and m.tool_calls]} ---")
         final = agent_state["messages"][-1]
@@ -426,7 +443,9 @@ def build_graph(llm, chatbot, cache_check_tool, cache_store_tool):
     
 
     async def finalize(state: GraphState)-> GraphState:
-        if cache_store_tool is not None and state.get("draft_answer"):
+        cache_store_tool = next((t for t in chatbot.available_tools if t.name == "store_semantic_cache"), None)
+   
+        if cache_store_tool is not None and state.get("draft_answer")and state["retry_count"] == 0:
             try:
                 await cache_store_tool.ainvoke(
                     {
