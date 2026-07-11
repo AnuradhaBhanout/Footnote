@@ -427,7 +427,7 @@ class MCP_ChatBot:
         result = await self.app.ainvoke(
             {
                 "original_query":query,
-                "current_query": None,
+                "current_query": query,
                 "messages":self.messages,
                 "retry_count":0,
                 "clarification_question": None,   
