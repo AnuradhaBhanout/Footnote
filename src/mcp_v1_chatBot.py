@@ -68,23 +68,26 @@ class MCP_ChatBot:
         self.thread_id = str(uuid.uuid4()) 
 
        
-        # self.llm = ChatOpenAI(
-        #     model="nvidia/nemotron-3-ultra-550b-a55b:free", # Target a solid open-weights model
-        #     openai_api_base="https://openrouter.ai/api/v1",  # Connect directly to OpenRouter 
-        #     openai_api_key=openai_key,
-        #     max_tokens=2024,
-        #     max_retries=1,
-        #     timeout=30,
-        # )
         self.llm = ChatOpenAI(
-            model="openai/gpt-oss-120b",
-            openai_api_base="https://api.groq.com/openai/v1",
-            openai_api_key=os.getenv("GROQ_API_KEY"),
+            model="nvidia/nemotron-3-ultra-550b-a55b:free", # Target a solid open-weights model
+            openai_api_base="https://openrouter.ai/api/v1",  # Connect directly to OpenRouter 
+            openai_api_key=openai_key,
             max_tokens=2024,
             max_retries=1,
             timeout=30,
             model_kwargs={"parallel_tool_calls": False},
         )
+
+        # self.llm = ChatOpenAI(
+        #     model="llama-3.1-8b-instant",
+        #     openai_api_base="https://api.groq.com/openai/v1",
+        #     openai_api_key=os.getenv("GROQ_API_KEY"),
+        #     max_tokens=2024,
+        #     max_retries=1,
+        #     timeout=30,
+        #     model_kwargs={"parallel_tool_calls": False},
+        # )
+
         # self.llm = ChatOllama(
         #     model="llama3.1",
         #     temperature=0,
@@ -242,6 +245,10 @@ class MCP_ChatBot:
             "term, refers to 'that paper' or similar without specifying which, or is missing a needed "
             "detail — call ask_clarification with a plain-language question and 2-4 short options. "
             "Do NOT call any other tool in the same turn if you call ask_clarification.\n"
+            "0.5. When calling search_papers or hybrid_search_papers, extract the core topic/title as a "
+            "clean search phrase — strip filler like 'stands for', 'is about', 'called'. E.g. if the user "
+            "says 'POPE stands for Privileged On-Policy Exploration', search for 'Privileged On-Policy "
+            "Exploration', not the full sentence.\n"
             "1. NEVER invent a tool name. Use ONLY the names listed above.\n"
             "2. For paper info use ONLY: hybrid_search_papers, search_papers, extract_info.\n"
             "3. After calling search_papers, you MUST call extract_info for EACH paper_id returned.\n"
@@ -249,7 +256,8 @@ class MCP_ChatBot:
             "5. NEVER summarize a paper without first calling extract_info on its paper_id.\n"
             "6. When you use a tool, you MUST wait for the tool output before claiming you have finished the task.\n"
             "7. If a tool result for 'hybrid_search_papers' has 'evaluator_verdict.sufficient: false', "
-            "do NOT provide an answer. Instead, try 'search_papers' with different terms.\n\n"
+            "try 'search_papers' ONCE with different terms. If that also returns no useful results, "
+            "STOP searching and tell the user you couldn't find matching papers — do NOT retry more than once.\n\n"
 
             "CITATION & INTEGRITY RULES:\n"
             "- You must use the EXACT title and authors as returned by the tools.\n"

@@ -40,11 +40,16 @@ _index_loaded = False
 _semantic_cache = SemanticCache(model=_hybrid_index.model) # reuse the loaded model
 
 _evaluator_client =OpenAI(
-    base_url = "https://api.groq.com/openai/v1",
-    api_key=os.getenv("GROQ_API_KEY"),
+    base_url = "https://openrouter.ai/api/v1",
+    api_key=os.getenv("OPENAI_API_KEY"),
 )
 
-EVALUATOR_MODEL = "openai/gpt-oss-120b"
+# _evaluator_client =OpenAI(
+#     base_url = "https://api.groq.com/openai/v1",
+#     api_key=os.getenv("GROQ_API_KEY"),
+# )
+
+EVALUATOR_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
 
 def evaluate_relevance(query:str,results:list)->dict:
     """LLM-as-judge: is at least one retrieved paper actually relevant, or is this a bad batch?"""
@@ -175,7 +180,11 @@ async def search_papers(topic: str, max_results: int = 5) -> List[str]:
     )
 
     #papers = client.results(search)
-    papers = await asyncio.to_thread(lambda: list(client.results(search)))
+    try:
+      papers = await asyncio.wait_for( asyncio.to_thread(lambda: list(client.results(search))), timeout=45.0)
+    except asyncio.TimeoutError:
+        logging.error(f"search_papers: arxiv timed out for topic '{topic}'")
+        return
     
     # Create directory for this topic
     path = os.path.join(PAPER_DIR, topic.lower().replace(" ", "_"))
