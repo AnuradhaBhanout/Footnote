@@ -188,7 +188,9 @@ async def chat(request: ChatRequest):
                         output = output.content
                     if not isinstance(output,str):
                         output = str(output)
-                    if len(output) > 300:
+                    # if len(output) > 300:
+                    #     output = output[:300] + "..."
+                    if name not in ("hybrid_search_papers", "search_papers", "extract_info") and len(output) > 300:
                         output = output[:300] + "..."
                     yield sse_event("tool_end",{
                         "tool":name,
@@ -270,7 +272,9 @@ async def resume(request: ResumeRequest):
                         output = output.content
                     if not isinstance(output,str):
                         output = str(output)
-                    if len(output) > 300:
+                    # if len(output) > 300:
+                    #     output = output[:300] + "..."
+                    if name not in ("hybrid_search_papers", "search_papers", "extract_info") and len(output) > 300:
                         output = output[:300] + "..."
                     yield sse_event("tool_end",{
                         "tool":name,
