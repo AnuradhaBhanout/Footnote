@@ -7,7 +7,7 @@ from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_excep
 from openai import APIError
 import anyio
 from mcp.shared.exceptions import McpError
-
+from langgraph.errors import GraphRecursionError
 
 
 import os
@@ -302,13 +302,22 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
             include_system=False,
         )
         try:
-            agent_state = await chatbot.agent.ainvoke({"messages":messages},config={"recursion_limit": 25})
+            agent_state = await chatbot.agent.ainvoke({"messages":messages},config={"recursion_limit": 12})
+
+        except GraphRecursionError:
+            logger.error("run_agent: hit internal recursion limit — agent looped without converging")
+            return {
+                **state,
+                "draft_answer": "I couldn't find anything matching that after several attempts — could you try a different phrasing or a known paper title?",
+                "retry_count": state["retry_count"] + 1,
+            }
+
         except (anyio.ClosedResourceError,McpError):
             for attempt in range(2):
                 chatbot.reconnect_event.set()
                 await chatbot.ready_event.wait()
                 try:
-                    agent_state = await chatbot.agent.ainvoke({"messages": messages}, config={"recursion_limit": 25})
+                    agent_state = await chatbot.agent.ainvoke({"messages": messages}, config={"recursion_limit": 12})
                     break
                 except (anyio.ClosedResourceError,McpError)as e:
                     if attempt == 1:
@@ -323,7 +332,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
             if "tool call validation failed" in str(e) or "Failed to call a function" in str(e):
                 logger.warning(f"Malformed tool call, retrying once: {e}")
                 try:
-                    agent_state = await chatbot.agent.ainvoke({"messages": messages}, config={"recursion_limit": 25})
+                    agent_state = await chatbot.agent.ainvoke({"messages": messages}, config={"recursion_limit": 55})
                 except APIError as e2:
                     logger.error(f"run_agent: retry also failed: {e2}")
                     return {**state, "draft_answer": "I had trouble processing that — could you try rephrasing?", "retry_count": state["retry_count"] + 1}
@@ -404,7 +413,10 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
         
         if last_tool_msg:
             try:
-                data = json.loads(last_tool_msg.content)
+                content = last_tool_msg.content
+                if isinstance(content, list):
+                    content = next((b["text"] for b in content if isinstance(b, dict) and b.get("type") == "text"), "")
+                data = json.loads(content)
                 
                 # Check for 'insufficient' verdict OR completely empty results list
                 verdict = data.get("evaluator_verdict", {})
