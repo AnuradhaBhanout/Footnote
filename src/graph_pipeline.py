@@ -288,114 +288,123 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
 
     async def run_agent(state: GraphState)-> GraphState:
         logger.info(f"--- NODE START: run_agent with query: {state['current_query']} ---")
-        messages = state["messages"]
-        
-        if not messages or messages[-1].content != state["current_query"]:
-            messages = messages+[HumanMessage(content=state["current_query"])]
-
-        # Trim before passing to agent — prevents context bloat causing loops
-        messages = trim_messages(
-            messages,
-            max_tokens=60,
-            token_counter=len,
-            strategy="last",
-            include_system=False,
-        )
         try:
-            agent_state = await chatbot.agent.ainvoke({"messages":messages},config={"recursion_limit": 12})
+            messages = state["messages"]
+            
+            if not messages or messages[-1].content != state["current_query"]:
+                messages = messages+[HumanMessage(content=state["current_query"])]
 
-        except GraphRecursionError:
-            logger.error("run_agent: hit internal recursion limit — agent looped without converging")
+            # Trim before passing to agent — prevents context bloat causing loops
+            messages = trim_messages(
+                messages,
+                max_tokens=60,
+                token_counter=len,
+                strategy="last",
+                include_system=False,
+            )
+            try:
+                agent_state = await chatbot.agent.ainvoke({"messages":messages},config={"recursion_limit": 12})
+
+            except GraphRecursionError:
+                logger.error("run_agent: hit internal recursion limit — agent looped without converging")
+                return {
+                    **state,
+                    "draft_answer": "I couldn't find anything matching that after several attempts — could you try a different phrasing or a known paper title?",
+                    "retry_count": state["retry_count"] + 1,
+                }
+
+            except (anyio.ClosedResourceError,McpError):
+                for attempt in range(2):
+                    chatbot.reconnect_event.set()
+                    await chatbot.ready_event.wait()
+                    try:
+                        agent_state = await chatbot.agent.ainvoke({"messages": messages}, config={"recursion_limit": 12})
+                        break
+                    except (anyio.ClosedResourceError,McpError)as e:
+                        if attempt == 1:
+                            logger.error(f"run_agent: reconnect retries exhausted: {e}")
+                            return {
+                                **state,
+                                "draft_answer": "The research service is temporarily unavailable — please try again in a moment.",
+                                "retry_count": state["retry_count"] + 1,
+                            }
+                        
+            except APIError as e:
+                if "tool call validation failed" in str(e) or "Failed to call a function" in str(e):
+                    logger.warning(f"Malformed tool call, retrying once: {e}")
+                    try:
+                        agent_state = await chatbot.agent.ainvoke({"messages": messages}, config={"recursion_limit": 55})
+                    except Exception as e2:
+                        logger.error(f"run_agent: retry also failed: {e2}")
+                        return {**state, "draft_answer": "I had trouble processing that — could you try rephrasing?", "retry_count": state["retry_count"] + 1}
+                else:
+                    raise
+                
+    #optimization ( check if the agent asked for clarification instead of searching )
+            agent_messages = agent_state["messages"]
+            logger.info(f"--- AGENT ACTIONS: {[m.tool_calls for m in agent_state['messages'] if hasattr(m, 'tool_calls') and m.tool_calls]} ---")
+
+            last_ai = next((m for m in reversed(agent_messages) if isinstance(m,AIMessage)and getattr(m,"tool_calls",None)),None)
+
+            if last_ai:
+                clarify_call = next((tc for tc in last_ai.tool_calls if tc["name"] == "ask_clarification"),None)
+                if clarify_call:
+                    args = clarify_call.get("args",{})
+                    logger.info(f"----RUN_AGENT: Agent requested clarification: {args.get('question')}")
+                    return{
+                        **state,
+                        "messages": agent_messages,
+                        "clarification_question":args.get("question","Could you clarify?"),
+                        "clarification_options":args.get("options",[]),
+                    }
+
+
+
+            final = agent_state["messages"][-1]
+            draft = final.content if final.content else ""
+            logger.info("--- NODE END: run_agent completed ---")
+
+            #new_retry_count = state["retry_count"]
+            # if state["messages"] and isinstance(state["messages"][-1], ToolMessage):
+            #     if "[]" in state["messages"][-1].content: # Simple empty check
+            #        new_retry_count += 1
+
+            new_retry_count = state["retry_count"]
+            last_tool = next(
+                (m for m in reversed(agent_state["messages"]) if isinstance(m, ToolMessage)),
+                None
+            )
+            if last_tool:
+                try:
+                    content = last_tool.content
+                    if isinstance(content,list):
+                        content = next( (b["text"] for b in content if isinstance(b,dict) and b.get("type") == "text"),"")
+                        
+                    data = json.loads(content)
+                    results = data.get("results", data.get("papers", []))
+                    if len(results) == 0:
+                        new_retry_count += 1
+                except (json.JSONDecodeError, AttributeError):
+                    pass    
+            
+            if not draft:
+                logger.warning("--- RUN_AGENT: LLM returned empty content ---")
             return {
                 **state,
-                "draft_answer": "I couldn't find anything matching that after several attempts — could you try a different phrasing or a known paper title?",
+                "messages":agent_state["messages"],
+                "draft_answer": draft,
+                "clarification_question": None,
+                "clarification_options": [],
+                "retry_count": new_retry_count
+                    }
+        
+        except Exception as e:
+            logger.error(f"run_agent: unhandled exception: {type(e).__name__}: {e}", exc_info=True)
+            return {
+                **state,
+                "draft_answer": "I ran into an unexpected issue processing that — please try again.",
                 "retry_count": state["retry_count"] + 1,
             }
-
-        except (anyio.ClosedResourceError,McpError):
-            for attempt in range(2):
-                chatbot.reconnect_event.set()
-                await chatbot.ready_event.wait()
-                try:
-                    agent_state = await chatbot.agent.ainvoke({"messages": messages}, config={"recursion_limit": 12})
-                    break
-                except (anyio.ClosedResourceError,McpError)as e:
-                    if attempt == 1:
-                        logger.error(f"run_agent: reconnect retries exhausted: {e}")
-                        return {
-                            **state,
-                            "draft_answer": "The research service is temporarily unavailable — please try again in a moment.",
-                            "retry_count": state["retry_count"] + 1,
-                        }
-                    
-        except APIError as e:
-            if "tool call validation failed" in str(e) or "Failed to call a function" in str(e):
-                logger.warning(f"Malformed tool call, retrying once: {e}")
-                try:
-                    agent_state = await chatbot.agent.ainvoke({"messages": messages}, config={"recursion_limit": 55})
-                except APIError as e2:
-                    logger.error(f"run_agent: retry also failed: {e2}")
-                    return {**state, "draft_answer": "I had trouble processing that — could you try rephrasing?", "retry_count": state["retry_count"] + 1}
-            else:
-                raise
-            
-#optimization ( check if the agent asked for clarification instead of searching )
-        agent_messages = agent_state["messages"]
-        logger.info(f"--- AGENT ACTIONS: {[m.tool_calls for m in agent_state['messages'] if hasattr(m, 'tool_calls') and m.tool_calls]} ---")
-
-        last_ai = next((m for m in reversed(agent_messages) if isinstance(m,AIMessage)and getattr(m,"tool_calls",None)),None)
-
-        if last_ai:
-            clarify_call = next((tc for tc in last_ai.tool_calls if tc["name"] == "ask_clarification"),None)
-            if clarify_call:
-                args = clarify_call.get("args",{})
-                logger.info(f"----RUN_AGENT: Agent requested clarification: {args.get('question')}")
-                return{
-                    **state,
-                    "messages": agent_messages,
-                    "clarification_question":args.get("question","Could you clarify?"),
-                    "clarification_options":args.get("options",[]),
-                }
-
-
-
-        final = agent_state["messages"][-1]
-        draft = final.content if final.content else ""
-        logger.info("--- NODE END: run_agent completed ---")
-
-        #new_retry_count = state["retry_count"]
-        # if state["messages"] and isinstance(state["messages"][-1], ToolMessage):
-        #     if "[]" in state["messages"][-1].content: # Simple empty check
-        #        new_retry_count += 1
-
-        new_retry_count = state["retry_count"]
-        last_tool = next(
-            (m for m in reversed(agent_state["messages"]) if isinstance(m, ToolMessage)),
-            None
-        )
-        if last_tool:
-            try:
-                content = last_tool.content
-                if isinstance(content,list):
-                    content = next( (b["text"] for b in content if isinstance(b,dict) and b.get("type") == "text"),"")
-                    
-                data = json.loads(content)
-                results = data.get("results", data.get("papers", []))
-                if len(results) == 0:
-                    new_retry_count += 1
-            except (json.JSONDecodeError, AttributeError):
-                pass    
-        
-        if not draft:
-            logger.warning("--- RUN_AGENT: LLM returned empty content ---")
-        return {
-            **state,
-            "messages":agent_state["messages"],
-            "draft_answer": draft,
-            "clarification_question": None,
-            "clarification_options": [],
-            "retry_count": new_retry_count
-                }
     
 
 
