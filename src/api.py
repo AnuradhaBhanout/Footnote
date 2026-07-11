@@ -227,6 +227,7 @@ async def chat(request: ChatRequest):
         
         except Exception as e:
             logger.error(f"Stream error: {e}", exc_info=True)
+            user_message = "Something went wrong processing your request. Please try again."
             yield sse_event("error",{"message":str(e)})
 
     return StreamingResponse(
