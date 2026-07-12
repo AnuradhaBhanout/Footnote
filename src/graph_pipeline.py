@@ -318,7 +318,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                     chatbot.reconnect_event.set()
                     await chatbot.ready_event.wait()
                     try:
-                        agent_state = await chatbot.agent.ainvoke({"messages": messages}, config={"recursion_limit": 12})
+                        agent_state = await chatbot.agent.ainvoke({"messages": messages}, config={"recursion_limit": 22})
                         break
                     except (anyio.ClosedResourceError,McpError)as e:
                         if attempt == 1:
