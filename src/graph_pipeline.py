@@ -102,20 +102,24 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
    # reformulate_llm = llm.with_structured_output(QueryReformulation,method="function_calling")
 
     async def check_cache(state: GraphState)-> GraphState:
-        cache_check_tool = next((t for t in chatbot.available_tools if t.name == "check_semantic_cache"), None)
-    # 1. Check if the tool actually exists
-        if cache_check_tool is None:
-            logger.warning("Cache tool missing, skipping cache check.")
-            return {**state, "cache_hit": False}
-
+        await chatbot.acquire_agent()
         try:
+            cache_check_tool = next((t for t in chatbot.available_tools if t.name == "check_semantic_cache"), None)
+        # 1. Check if the tool actually exists
+            if cache_check_tool is None:
+                logger.warning("Cache tool missing, skipping cache check.")
+                return {**state, "cache_hit": False}
+
+            
             raw = await cache_check_tool.ainvoke({"query": state["original_query"]})
             result = _parse_tool_result(raw)
             if result.get("hit"):
                 return {**state, "cache_hit": True, "draft_answer": result["answer"]}
         except Exception as e:
             logger.error(f"Cache check failed:{type(e).__name__}: {e}")
-            
+
+        finally:
+            await chatbot.release_agent()     
         return {**state, "cache_hit": False}
     
 
@@ -286,15 +290,73 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
 
 
 
-    async def run_agent(state: GraphState)-> GraphState:
+    # async def run_agent(state: GraphState)-> GraphState:
+    #     logger.info(f"--- NODE START: run_agent with query: {state['current_query']} ---")
+        
+    #     try:
+    #         messages = state["messages"]
+            
+    #         if not messages or messages[-1].content != state["current_query"]:
+    #             messages = messages+[HumanMessage(content=state["current_query"])]
+
+    #         # Trim before passing to agent — prevents context bloat causing loops
+    #         messages = trim_messages(
+    #             messages,
+    #             max_tokens=60,
+    #             token_counter=len,
+    #             strategy="last",
+    #             include_system=False,
+    #         )
+    #         agent = await chatbot.acquire_agent()
+    #         try:
+    #             agent_state = await agent.ainvoke({"messages":messages},config={"recursion_limit": 20})
+
+    #         except GraphRecursionError:
+    #             logger.error("run_agent: hit internal recursion limit — agent looped without converging")
+    #             return {
+    #                 **state,
+    #                 "draft_answer": "I couldn't find anything matching that after several attempts — could you try a different phrasing or a known paper title?",
+    #                 "retry_count": state["retry_count"] + 1,
+    #             }
+
+    #         except (anyio.ClosedResourceError,McpError):
+    #             for attempt in range(2):
+    #                 chatbot.reconnect_event.set()
+    #                 await chatbot.ready_event.wait()
+    #                 agent = await chatbot.acquire_agent()
+    #                 try:
+    #                     agent_state = await agent.ainvoke({"messages": messages}, config={"recursion_limit": 22})
+    #                     break
+    #                 except (anyio.ClosedResourceError,McpError)as e:
+    #                     if attempt == 1:
+    #                         logger.error(f"run_agent: reconnect retries exhausted: {e}")
+    #                         return {
+    #                             **state,
+    #                             "draft_answer": "The research service is temporarily unavailable — please try again in a moment.",
+    #                             "retry_count": state["retry_count"] + 1,
+    #                         }
+                        
+    #         except APIError as e:
+    #             if "tool call validation failed" in str(e) or "Failed to call a function" in str(e):
+    #                 logger.warning(f"Malformed tool call, retrying once: {e}")
+    #                 try:
+    #                     agent_state = await agent.ainvoke({"messages": messages}, config={"recursion_limit": 55})
+    #                 except Exception as e2:
+    #                     logger.error(f"run_agent: retry also failed: {e2}")
+    #                     return {**state, "draft_answer": "I had trouble processing that — could you try rephrasing?", "retry_count": state["retry_count"] + 1}
+    #             else:
+    #                 raise
+
+    #         finally:
+    #             await chatbot.release_agent()
+    async def run_agent(state: GraphState) -> GraphState:
         logger.info(f"--- NODE START: run_agent with query: {state['current_query']} ---")
         try:
             messages = state["messages"]
-            
-            if not messages or messages[-1].content != state["current_query"]:
-                messages = messages+[HumanMessage(content=state["current_query"])]
 
-            # Trim before passing to agent — prevents context bloat causing loops
+            if not messages or messages[-1].content != state["current_query"]:
+                messages = messages + [HumanMessage(content=state["current_query"])]
+
             messages = trim_messages(
                 messages,
                 max_tokens=60,
@@ -302,9 +364,16 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                 strategy="last",
                 include_system=False,
             )
-            agent = await chatbot.acquire_agent()
+
+            async def call_agent(recursion_limit):
+                agent = await chatbot.acquire_agent()
+                try:
+                    return await agent.ainvoke({"messages": messages}, config={"recursion_limit": recursion_limit})
+                finally:
+                    await chatbot.release_agent()
+
             try:
-                agent_state = await agent.ainvoke({"messages":messages},config={"recursion_limit": 20})
+                agent_state = await call_agent(20)
 
             except GraphRecursionError:
                 logger.error("run_agent: hit internal recursion limit — agent looped without converging")
@@ -314,15 +383,14 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                     "retry_count": state["retry_count"] + 1,
                 }
 
-            except (anyio.ClosedResourceError,McpError):
+            except (anyio.ClosedResourceError, McpError):
                 for attempt in range(2):
                     chatbot.reconnect_event.set()
                     await chatbot.ready_event.wait()
-                    agent = await chatbot.acquire_agent()
                     try:
-                        agent_state = await agent.ainvoke({"messages": messages}, config={"recursion_limit": 22})
+                        agent_state = await call_agent(22)
                         break
-                    except (anyio.ClosedResourceError,McpError)as e:
+                    except (anyio.ClosedResourceError, McpError) as e:
                         if attempt == 1:
                             logger.error(f"run_agent: reconnect retries exhausted: {e}")
                             return {
@@ -330,20 +398,17 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                                 "draft_answer": "The research service is temporarily unavailable — please try again in a moment.",
                                 "retry_count": state["retry_count"] + 1,
                             }
-                        
+
             except APIError as e:
                 if "tool call validation failed" in str(e) or "Failed to call a function" in str(e):
                     logger.warning(f"Malformed tool call, retrying once: {e}")
                     try:
-                        agent_state = await agent.ainvoke({"messages": messages}, config={"recursion_limit": 55})
+                        agent_state = await call_agent(55)
                     except Exception as e2:
-                        logger.error(f"run_agent: retry also failed: {e2}")
+                        logger.error(f"run_agent: retry also failed: {type(e2).__name__}: {e2}")
                         return {**state, "draft_answer": "I had trouble processing that — could you try rephrasing?", "retry_count": state["retry_count"] + 1}
                 else:
                     raise
-
-            finally:
-                await chatbot.release_agent()
                 
     #optimization ( check if the agent asked for clarification instead of searching )
             agent_messages = agent_state["messages"]
@@ -496,18 +561,24 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
     
 
     async def finalize(state: GraphState)-> GraphState:
-        cache_store_tool = next((t for t in chatbot.available_tools if t.name == "store_semantic_cache"), None)
-   
-        if cache_store_tool is not None and state.get("draft_answer")and state["retry_count"] == 0:
+        if state.get("draft_answer") and state["retry_count"] == 0:
+            await chatbot.acquire_agent()
             try:
-                await cache_store_tool.ainvoke(
-                    {
-                        "query":state["original_query"],
-                        "answer":state["draft_answer"]
-                    }
-                )
+                cache_store_tool = next((t for t in chatbot.available_tools if t.name == "store_semantic_cache"), None)
+        
+                if cache_store_tool is not None and state.get("draft_answer")and state["retry_count"] == 0:
+                    
+                        await cache_store_tool.ainvoke(
+                            {
+                                "query":state["original_query"],
+                                "answer":state["draft_answer"]
+                            }
+                        )
             except Exception as e:
                 logger.error(f"Cache store failed (non-fatal): {e}")
+            
+            finally:
+                await chatbot.release_agent()
         return state
     
 
