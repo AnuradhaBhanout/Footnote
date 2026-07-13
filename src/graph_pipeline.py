@@ -302,8 +302,9 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                 strategy="last",
                 include_system=False,
             )
+            agent = await chatbot.acquire_agent()
             try:
-                agent_state = await chatbot.agent.ainvoke({"messages":messages},config={"recursion_limit": 12})
+                agent_state = await agent.ainvoke({"messages":messages},config={"recursion_limit": 20})
 
             except GraphRecursionError:
                 logger.error("run_agent: hit internal recursion limit — agent looped without converging")
@@ -317,8 +318,9 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                 for attempt in range(2):
                     chatbot.reconnect_event.set()
                     await chatbot.ready_event.wait()
+                    agent = await chatbot.acquire_agent()
                     try:
-                        agent_state = await chatbot.agent.ainvoke({"messages": messages}, config={"recursion_limit": 22})
+                        agent_state = await agent.ainvoke({"messages": messages}, config={"recursion_limit": 22})
                         break
                     except (anyio.ClosedResourceError,McpError)as e:
                         if attempt == 1:
@@ -333,12 +335,15 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                 if "tool call validation failed" in str(e) or "Failed to call a function" in str(e):
                     logger.warning(f"Malformed tool call, retrying once: {e}")
                     try:
-                        agent_state = await chatbot.agent.ainvoke({"messages": messages}, config={"recursion_limit": 55})
+                        agent_state = await agent.ainvoke({"messages": messages}, config={"recursion_limit": 55})
                     except Exception as e2:
                         logger.error(f"run_agent: retry also failed: {e2}")
                         return {**state, "draft_answer": "I had trouble processing that — could you try rephrasing?", "retry_count": state["retry_count"] + 1}
                 else:
                     raise
+
+            finally:
+                await chatbot.release_agent()
                 
     #optimization ( check if the agent asked for clarification instead of searching )
             agent_messages = agent_state["messages"]
