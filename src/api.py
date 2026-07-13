@@ -149,6 +149,18 @@ def sse_event(event: str,data: dict)-> str:
     return f"event:{event}\ndata:{json.dumps(data)}\n\n"
 
 
+TRUNCATE_EXEMPT_TOOLS = ("hybrid_search_papers", "search_papers", "extract_info")
+
+def format_tool_output(name: str, output) -> str:
+    if hasattr(output, "content"):       # ToolMessage
+        output = output.content
+    if not isinstance(output, str):
+        output = str(output)
+    if name not in TRUNCATE_EXEMPT_TOOLS and len(output) > 300:
+        output = output[:300] + "..."
+    return output
+
+
 @app.post("/chat")
 async def chat(request: ChatRequest):
     "streaming through Langgraph"
@@ -182,16 +194,8 @@ async def chat(request: ChatRequest):
                     })
 
                 elif kind == "on_tool_end":
-                    output = event.get("data",{}).get("output","")
-
-                    if hasattr(output, "content"):       # ToolMessage
-                        output = output.content
-                    if not isinstance(output,str):
-                        output = str(output)
-                    # if len(output) > 300:
-                    #     output = output[:300] + "..."
-                    if name not in ("hybrid_search_papers", "search_papers", "extract_info") and len(output) > 300:
-                        output = output[:300] + "..."
+                    output = format_tool_output(name, event.get("data",{}).get("output",""))
+                    yield sse_event("tool_end", {"tool": name, "output": output})
                     yield sse_event("tool_end",{
                         "tool":name,
                         "output":output,
@@ -267,16 +271,8 @@ async def resume(request: ResumeRequest):
                     })
                 
                 elif kind == "on_tool_end":
-                    output = event.get("data",{}).get("output","")
-
-                    if hasattr(output, "content"):       # ToolMessage
-                        output = output.content
-                    if not isinstance(output,str):
-                        output = str(output)
-                    # if len(output) > 300:
-                    #     output = output[:300] + "..."
-                    if name not in ("hybrid_search_papers", "search_papers", "extract_info") and len(output) > 300:
-                        output = output[:300] + "..."
+                    output = format_tool_output(name, event.get("data",{}).get("output",""))
+                    yield sse_event("tool_end", {"tool": name, "output": output})
                     yield sse_event("tool_end",{
                         "tool":name,
                         "output":output,
