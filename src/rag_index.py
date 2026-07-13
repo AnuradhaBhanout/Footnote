@@ -56,6 +56,16 @@ def load_all_papers() -> dict:
     return papers
 
 
+def get_papers_fingerprint() -> tuple[int, str]:
+    
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*), COALESCE(MAX(paper_id), '') FROM papers;")
+        row = cur.fetchone()
+    conn.close()
+    return row[0], row[1]
+
+
 
 # Turn paper into text text chunks
 def paper_to_text(paper_info:dict)-> str:
@@ -75,7 +85,9 @@ class HybridIndex:
         self.texts = []
         self.embeddings = None
         self.bm25 = None
-        
+        self._last_fingerprint = None
+
+
     def build(self):
         """Recompute the index from whatever is currently in papers/."""
         papers = load_all_papers()
@@ -187,9 +199,13 @@ class HybridIndex:
         """
         Compare paper_ids on disk vs in memory.
         """
-        current_papers = load_all_papers()
-        if set(current_papers.keys()) != set(self.paper_ids):
+        fingerprint = get_papers_fingerprint()
+        if fingerprint != self._last_fingerprint:
             self.build()
+            self._last_fingerprint = fingerprint
+        # current_papers = load_all_papers()
+        # if set(current_papers.keys()) != set(self.paper_ids):
+        #     self.build()
 
 
 
