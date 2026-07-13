@@ -195,10 +195,11 @@ async def chat(request: ChatRequest):
 
                 elif kind == "on_tool_end":
                     output = format_tool_output(name, event.get("data",{}).get("output",""))
-                    yield sse_event("tool_end", {"tool": name, "output": output})
+                    input_args = event.get("data",{}).get("input",{})
                     yield sse_event("tool_end",{
                         "tool":name,
                         "output":output,
+                        "input": input_args,
                     })
          
                 elif kind == "on_chat_model_stream":
@@ -272,10 +273,11 @@ async def resume(request: ResumeRequest):
                 
                 elif kind == "on_tool_end":
                     output = format_tool_output(name, event.get("data",{}).get("output",""))
-                    yield sse_event("tool_end", {"tool": name, "output": output})
+                    input_args = event.get("data",{}).get("input",{})
                     yield sse_event("tool_end",{
                         "tool":name,
                         "output":output,
+                        "input": input_args,
                     })
 
                 elif kind == "on_chat_model_stream":
