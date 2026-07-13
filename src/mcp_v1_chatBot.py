@@ -48,7 +48,7 @@ openai_key = os.getenv("OPENAI_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 @tool
-def ask_clarification(question:str,options: list[str] = [])-> str:
+def ask_clarification(question:str,options: list[str] | None = None)-> str:
     """Call this INSTEAD of any search  tool when the user's request is ambiguous,
        uses an unclear abbreviation/name, or is missing a detail needed  to act.
        Do NOT call this together with any other tool in the same turn.
@@ -57,6 +57,7 @@ def ask_clarification(question:str,options: list[str] = [])-> str:
           options: 2-4 short possible interpretations to help the user answer quickly.
 
     """
+    options = options or []
     return "CLARIFICATION_REQUESTED"
 
 class MCP_ChatBot:
@@ -68,25 +69,25 @@ class MCP_ChatBot:
         self.thread_id = str(uuid.uuid4()) 
 
        
-        # self.llm = ChatOpenAI(
-        #     model="nvidia/nemotron-3-ultra-550b-a55b:free", # Target a solid open-weights model
-        #     openai_api_base="https://openrouter.ai/api/v1",  # Connect directly to OpenRouter 
-        #     openai_api_key=openai_key,
-        #     max_tokens=2024,
-        #     max_retries=1,
-        #     timeout=30,
-        #     model_kwargs={"parallel_tool_calls": False},
-        # )
-
         self.llm = ChatOpenAI(
-            model="llama-3.3-70b-versatile",
-            openai_api_base="https://api.groq.com/openai/v1",
-            openai_api_key=os.getenv("GROQ_API_KEY"),
+            model="nvidia/nemotron-3-ultra-550b-a55b:free", # Target a solid open-weights model
+            openai_api_base="https://openrouter.ai/api/v1",  # Connect directly to OpenRouter 
+            openai_api_key=openai_key,
             max_tokens=2024,
             max_retries=1,
             timeout=30,
             model_kwargs={"parallel_tool_calls": False},
         )
+
+        # self.llm = ChatOpenAI(
+        #     model="llama-3.3-70b-versatile",
+        #     openai_api_base="https://api.groq.com/openai/v1",
+        #     openai_api_key=os.getenv("GROQ_API_KEY"),
+        #     max_tokens=2024,
+        #     max_retries=1,
+        #     timeout=30,
+        #     model_kwargs={"parallel_tool_calls": False},
+        # )
 
         # self.llm = ChatOllama(
         #     model="llama3.1",
@@ -108,6 +109,26 @@ class MCP_ChatBot:
         self.reconnect_event = asyncio.Event()
         self.ready_event = asyncio.Event()
 
+        # NEW
+        self._inflight = 0
+        self._inflight_lock = asyncio.Lock()
+        self._swap_gate = asyncio.Event()
+        self._swap_gate.set()   # set = no swap in progress
+
+
+    async def acquire_agent(self):
+        while True:
+            await self._swap_gate.wait()
+            async with self._inflight_lock:
+                if self._swap_gate.is_set():
+                    self._inflight += 1
+                    return self.agent
+            # a swap started between wait() and lock — loop and retry
+
+    async def release_agent(self):
+        async with self._inflight_lock:
+            self._inflight -= 1
+
 
 
     async def session_manager(self):
@@ -115,16 +136,21 @@ class MCP_ChatBot:
             await self.connect_to_servers()
             await self._build_agent_and_graph()
             self.ready_event.set()
+            
             while True:
                 await self.reconnect_event.wait()
                 self.reconnect_event.clear()
                 self.ready_event.clear()
+                self._swap_gate.clear()                 # block new acquire_agent() calls
+                while self._inflight > 0:                # wait for in-flight requests to release
+                    await asyncio.sleep(0.05)
                 try:
                     #await self.connect_to_servers()
                     await self._connect_with_retry()
                     await self._rebuild_agent()
                 except Exception as e:
                     logger.error(f"Reconnect failed: {e}")
+                self._swap_gate.set()                             # allow new acquire_agent() calls
                 self.ready_event.set()
         except asyncio.CancelledError:
             await self.exit_stack.aclose()
@@ -205,7 +231,7 @@ class MCP_ChatBot:
                lc_tool.description = (lc_tool.description or "").strip()
 
              self.available_tools.append(lc_tool)
-             logger.info(f"[SCHEMA DUMP] " + "; ".join(f"{t.name}: {getattr(t, 'args_schema', None)}" for t in self.available_tools))
+            logger.info(f"[SCHEMA DUMP] " + "; ".join(f"{t.name}: {getattr(t, 'args_schema', None)}" for t in raw_langchain_tools))
 
             print("\nConnected to server with tools:", [t.name for t in self.available_tools])
                 
