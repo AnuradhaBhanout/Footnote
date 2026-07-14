@@ -155,7 +155,11 @@ def format_tool_output(name: str, output) -> str:
     if hasattr(output, "content"):       # ToolMessage
         output = output.content
     if not isinstance(output, str):
-        output = str(output)
+        try:
+            output = json.dumps(output)
+        except (TypeError,ValueError):
+            output = str(output)
+        
     if name not in TRUNCATE_EXEMPT_TOOLS and len(output) > 300:
         output = output[:300] + "..."
     return output
