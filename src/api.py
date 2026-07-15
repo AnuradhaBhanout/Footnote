@@ -21,6 +21,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv,find_dotenv
 
 from contextlib import asynccontextmanager
+from citation_verifier import extract_real_papers_from_tool_results, ARXIV_ID_PATTERN
 
 load_dotenv(find_dotenv())
 
@@ -228,10 +229,14 @@ async def chat(request: ChatRequest):
                 return        # pause
             
             answer = state.values.get("draft_answer","")
+            cited_ids = list(
+                set(ARXIV_ID_PATTERN.findall(answer)) 
+                & set(extract_real_papers_from_tool_results(state.values.get("messages", [])).keys()))
 
             yield sse_event("done",{
                 "answer": answer,
                 "session_id": session_id,
+                "cited_paper_ids": cited_ids,
             })
         
         except Exception as e:
@@ -303,9 +308,15 @@ async def resume(request: ResumeRequest):
                 return        # pause
             
             answer = state.values.get("draft_answer","")
+
+            cited_ids = list(
+                set(ARXIV_ID_PATTERN.findall(answer)) 
+                & set(extract_real_papers_from_tool_results(state.values.get("messages", [])).keys()))
+            
             yield sse_event("done",{
                 "answer": answer,
                 "session_id": request.session_id,
+                "cited_paper_ids": cited_ids,
             })
         
         except Exception as e:
