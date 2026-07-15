@@ -94,7 +94,9 @@ def verify_citations(answer_text:str,messages:list,overlap_threshold: float = 0.
         real_title= real_papers[paper_id]
         overlap = _title_overlap_ration(real_title,answer_text)
         if overlap < overlap_threshold:
-            issues.append(f"paper '{paper_id}' is real, but its actual title (\"{real_title}\")")
+            issues.append(
+            f"paper '{paper_id}' is real, but its actual title (\"{real_title}\")"
             f"barely appears in the answer (overlap={overlap: .2f}) - title/findings may be invented."
+            )
 
     return{"passed": len(issues) == 0, "issues":issues}
