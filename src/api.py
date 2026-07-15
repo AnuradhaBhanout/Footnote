@@ -229,14 +229,16 @@ async def chat(request: ChatRequest):
                 return        # pause
             
             answer = state.values.get("draft_answer","")
-            cited_ids = list(
-                set(ARXIV_ID_PATTERN.findall(answer)) 
-                & set(extract_real_papers_from_tool_results(state.values.get("messages", [])).keys()))
+            # cited_ids = list(
+            #     set(ARXIV_ID_PATTERN.findall(answer)) 
+            #     & set(extract_real_papers_from_tool_results(state.values.get("messages", [])).keys()))
+
+            real_papers = extract_real_papers_from_tool_results(state.values.get("messages", []))
 
             yield sse_event("done",{
                 "answer": answer,
                 "session_id": session_id,
-                "cited_paper_ids": cited_ids,
+                "cited_paper_ids": list(real_papers.keys()),
             })
         
         except Exception as e:
@@ -309,14 +311,16 @@ async def resume(request: ResumeRequest):
             
             answer = state.values.get("draft_answer","")
 
-            cited_ids = list(
-                set(ARXIV_ID_PATTERN.findall(answer)) 
-                & set(extract_real_papers_from_tool_results(state.values.get("messages", [])).keys()))
+            # cited_ids = list(
+            #     set(ARXIV_ID_PATTERN.findall(answer)) 
+            #     & set(extract_real_papers_from_tool_results(state.values.get("messages", [])).keys()))
+            
+            real_papers = extract_real_papers_from_tool_results(state.values.get("messages", []))
             
             yield sse_event("done",{
                 "answer": answer,
                 "session_id": request.session_id,
-                "cited_paper_ids": cited_ids,
+                "cited_paper_ids": list(real_papers.keys()),
             })
         
         except Exception as e:
