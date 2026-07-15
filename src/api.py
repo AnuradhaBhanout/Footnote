@@ -232,8 +232,9 @@ async def chat(request: ChatRequest):
 
             citation_passed = state.values.get("citation_check_passed", False)
             real_papers = extract_real_papers_from_tool_results(state.values.get("messages", []))
-            cited_ids = list(real_papers.keys()) if citation_passed else []
-
+            cited_in_text = set(ARXIV_ID_PATTERN.findall(answer))
+            cited_ids = [pid for pid in cited_in_text if pid in real_papers] if citation_passed else []
+            
             yield sse_event("done",{
                 "answer": answer,
                 "session_id": session_id,
