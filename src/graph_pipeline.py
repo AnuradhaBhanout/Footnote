@@ -519,7 +519,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
 
 
     def check_citations(state: GraphState)-> GraphState:
-        result = verify_citations(state["draft_answer"],state["messages"])
+        result = verify_citations(state["draft_answer"],state["messages"],overlap_threshold=0.3)
         logger.info(f"--- CITATION CHECK: passed={result['passed']} issues={result['issues']}")
         return {**state,"citation_check_passed":result["passed"], "citation_issues":result["issues"]}
     
