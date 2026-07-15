@@ -49,7 +49,7 @@ _evaluator_client =OpenAI(
 #     api_key=os.getenv("GROQ_API_KEY"),
 # )
 
-EVALUATOR_MODEL = "nvidia/nemotron-3-super-120b-a12b:free"
+EVALUATOR_MODEL = "qwen/qwen3-coder:free"
 
 def evaluate_relevance(query:str,results:list)->dict:
     """LLM-as-judge: is at least one retrieved paper actually relevant, or is this a bad batch?"""
