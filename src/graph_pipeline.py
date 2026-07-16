@@ -85,6 +85,7 @@ class GraphState(TypedDict):
     retry_count: int
     clarification_question: Optional[str]
     clarification_options: list
+    answer_is_reliable: bool
 
 
 @retry(
@@ -381,6 +382,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                     **state,
                     "draft_answer": "I couldn't find anything matching that after several attempts — could you try a different phrasing or a known paper title?",
                     "retry_count": state["retry_count"] + 1,
+                    "answer_is_reliable": False,
                 }
 
             except (anyio.ClosedResourceError, McpError):
@@ -397,6 +399,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                                 **state,
                                 "draft_answer": "The research service is temporarily unavailable — please try again in a moment.",
                                 "retry_count": state["retry_count"] + 1,
+                                "answer_is_reliable": False, 
                             }
 
             except APIError as e:
@@ -406,7 +409,10 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                         agent_state = await call_agent(55)
                     except Exception as e2:
                         logger.error(f"run_agent: retry also failed: {type(e2).__name__}: {e2}")
-                        return {**state, "draft_answer": "I had trouble processing that — could you try rephrasing?", "retry_count": state["retry_count"] + 1}
+                        return {**state,
+                                "draft_answer": "I had trouble processing that — could you try rephrasing?", 
+                                "retry_count": state["retry_count"] + 1,
+                                "answer_is_reliable": False}
                 else:
                     raise
                 
@@ -465,7 +471,8 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                 "draft_answer": draft,
                 "clarification_question": None,
                 "clarification_options": [],
-                "retry_count": new_retry_count
+                "retry_count": new_retry_count,
+                "answer_is_reliable": bool(draft),
                     }
         
         except Exception as e:
@@ -474,6 +481,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                 **state,
                 "draft_answer": "I ran into an unexpected issue processing that — please try again.",
                 "retry_count": state["retry_count"] + 1,
+                "answer_is_reliable": False,
             }
     
 
@@ -557,12 +565,13 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
             **state,
             "draft_answer": "I don't have enough verified information to answer that accurately"
             "from your saved papers. Could you rephrase, or ask me to search again wit different terms?",
+            "answer_is_reliable": False,
 
         }
     
 
     async def finalize(state: GraphState)-> GraphState:
-        if state.get("draft_answer") and state["retry_count"] == 0:
+        if state.get("draft_answer") and state["retry_count"] == 0  and state.get("answer_is_reliable", False):
             await chatbot.acquire_agent()
             try:
                 cache_store_tool = next((t for t in chatbot.available_tools if t.name == "store_semantic_cache"), None)
