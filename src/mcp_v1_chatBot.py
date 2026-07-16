@@ -69,25 +69,25 @@ class MCP_ChatBot:
         self.thread_id = str(uuid.uuid4()) 
 
        
-        # self.llm = ChatOpenAI(
-        #     model="nvidia/nemotron-3-ultra-550b-a55b:free", # Target a solid open-weights model
-        #     openai_api_base="https://openrouter.ai/api/v1",  # Connect directly to OpenRouter 
-        #     openai_api_key=openai_key,
-        #     max_tokens=2024,
-        #     max_retries=1,
-        #     timeout=30,
-        #     model_kwargs={"parallel_tool_calls": False},
-        # )
-
         self.llm = ChatOpenAI(
-            model="llama-3.3-70b-versatile",
-            openai_api_base="https://api.groq.com/openai/v1",
-            openai_api_key=os.getenv("GROQ_API_KEY"),
+            model="qwen/qwen3-coder:free", # Target a solid open-weights model
+            openai_api_base="https://openrouter.ai/api/v1",  # Connect directly to OpenRouter 
+            openai_api_key=openai_key,
             max_tokens=2024,
             max_retries=1,
             timeout=30,
             model_kwargs={"parallel_tool_calls": False},
         )
+
+        # self.llm = ChatOpenAI(
+        #     model="llama-3.3-70b-versatile",
+        #     openai_api_base="https://api.groq.com/openai/v1",
+        #     openai_api_key=os.getenv("GROQ_API_KEY"),
+        #     max_tokens=2024,
+        #     max_retries=1,
+        #     timeout=30,
+        #     model_kwargs={"parallel_tool_calls": False},
+        # )
 
         # self.llm = ChatOllama(
         #     model="llama3.1",
