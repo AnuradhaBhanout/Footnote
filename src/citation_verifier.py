@@ -8,6 +8,9 @@ logger = logging.getLogger("RAG-Chatbot")
 
 ARXIV_ID_PATTERN = re.compile(r"\b(\d{4}\.\d{4,5}(?:v\d+)?|[a-z\-]+/\d{7}(?:v\d+)?)\b", re.IGNORECASE)
 
+def _strip_version(paper_id: str) -> str:
+    return re.sub(r"v\d+$", "", paper_id)
+
 
 def extract_real_papers_from_tool_results(messages: list) -> dict:
     real_papers = {}
@@ -34,7 +37,8 @@ def extract_real_papers_from_tool_results(messages: list) -> dict:
             data = json.loads(content)
             title = data.get("title","")
             if title:
-                real_papers[paper_id] = title
+               # real_papers[paper_id] = title
+                real_papers[_strip_version(paper_id)] = title
         except (json.JSONDecodeError, AttributeError,StopIteration):
             pass
 
@@ -50,7 +54,8 @@ def extract_real_papers_from_tool_results(messages: list) -> dict:
             papers = data.get("results", data.get("papers", []))
             for p in papers:
                 if isinstance(p, dict) and "paper_id" in p and "title" in p:
-                    real_papers[p["paper_id"]] = p["title"]
+                    #real_papers[p["paper_id"]] = p["title"]
+                    real_papers[_strip_version(p["paper_id"])] = p["title"]
         except (json.JSONDecodeError, AttributeError,StopIteration):
             pass
 
@@ -80,7 +85,8 @@ def verify_citations(answer_text:str,messages:list,overlap_threshold: float = 0.
     (right ID, wrong/invented title or findings - the harder fabrication case).
     """
     real_papers = extract_real_papers_from_tool_results(messages)
-    cited_ids = set(ARXIV_ID_PATTERN.findall(answer_text))
+    #cited_ids = set(ARXIV_ID_PATTERN.findall(answer_text))
+    cited_ids = {_strip_version(pid) for pid in ARXIV_ID_PATTERN.findall(answer_text)}
 
     if not cited_ids:
         return {"passed":True,"issues": []}
