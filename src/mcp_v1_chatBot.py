@@ -75,7 +75,7 @@ class MCP_ChatBot:
             openai_api_key=openai_key,
             max_tokens=2024,
             max_retries=1,
-            timeout=90,
+            timeout=33,
             model_kwargs={"parallel_tool_calls": False},
         )
 

@@ -411,6 +411,20 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                             "draft_answer": "The model took too long to respond — please try again.",
                             "retry_count": state["retry_count"] + 1,
                             "answer_is_reliable": False}
+                
+            except APIError as e:
+                if "tool call validation failed" in str(e) or "Failed to call a function" in str(e):
+                    logger.warning(f"Malformed tool call, retrying once: {e}")
+                    try:
+                        agent_state = await call_agent(55)
+                    except Exception as e2:
+                        logger.error(f"run_agent: retry also failed: {type(e2).__name__}: {e2}")
+                        return {**state,
+                                "draft_answer": "I had trouble processing that — could you try rephrasing?", 
+                                "retry_count": state["retry_count"] + 1,
+                                "answer_is_reliable": False}
+                else:
+                    raise
 
             except Exception as e:
                 # catch-all: anything not matched above skipped straight to
@@ -420,17 +434,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                         "draft_answer": "I ran into an unexpected issue processing that — please try again.",
                         "retry_count": state["retry_count"] + 1,
                         "answer_is_reliable": False}
-            # except APIError as e:
-            #     if "tool call validation failed" in str(e) or "Failed to call a function" in str(e):
-            #         logger.warning(f"Malformed tool call, retrying once: {e}")
-            #         try:
-            #             agent_state = await call_agent(55)
-            #         except Exception as e2:
-            #             logger.error(f"run_agent: retry also failed: {type(e2).__name__}: {e2}")
-            #             return {**state,
-            #                     "draft_answer": "I had trouble processing that — could you try rephrasing?", 
-            #                     "retry_count": state["retry_count"] + 1,
-            #                     "answer_is_reliable": False}
+
             
             # except httpx.ReadTimeout:
             #     logger.warning("run_agent: NVIDIA stream stalled, retrying once")
@@ -442,8 +446,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
             #                 "draft_answer": "The model took too long to respond — please try again.",
             #                 "retry_count": state["retry_count"] + 1,
             #                 "answer_is_reliable": False}
-            #     else:
-            #         raise
+
                 
     #optimization ( check if the agent asked for clarification instead of searching )
             agent_messages = agent_state["messages"]

@@ -288,53 +288,45 @@ def _insert_papers_sync(papers_info: dict, topic: str):
 
 
 
-#async def extract_info(paper_id: str) -> str:
 @mcp.tool()
 async def extract_info(paper_ids: List[str]) -> str:
+    if isinstance(paper_ids, str):        # tolerate a model that forgets to wrap in a list
+        paper_ids = [paper_ids]
 
     def _fetch():
         if not paper_ids:
             return []
-
         conn = get_conn()
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT title, authors, summary, pdf_url, published FROM papers WHERE paper_id = ANY(%s)",
+                "SELECT paper_id, title, authors, summary, pdf_url, published "
+                "FROM papers WHERE paper_id = ANY(%s)",
                 (paper_ids,)
             )
-            #row = cur.fetchone()
             rows = cur.fetchall()
         conn.close()
-        return row
-   
-    row = await asyncio.to_thread(_fetch)
-    if not row:
-        return f"There's no saved information related to paper {paper_ids}."
-    found_ids = {r[0] for r in row}
+        return rows
+
+    rows = await asyncio.to_thread(_fetch)
+    found_ids = {r[0] for r in rows}
     not_found = [pid for pid in paper_ids if pid not in found_ids]
 
-    papers_list = []
-    for r in row:
-        papers_list.append({
+    papers_list = [
+        {
             "paper_id": r[0],
             "title": r[1],
             "authors": r[2],
             "summary": r[3],
             "pdf_url": r[4],
-            "published": r[5]
-        })
+            "published": r[5],
+        }
+        for r in rows
+    ]
 
-    # return json.dumps({
-    #     "title": row[0],
-    #     "authors": row[1],
-    #     "summary": row[2],
-    #     "pdf_url": row[3],
-    #     "published": row[4],
-    # }, indent=2)
-    return json.dumps({
-        "papers": papers_list,
-        "not_found": not_found
-    }, indent=2)
+    return json.dumps({"papers": papers_list, "not_found": not_found}, indent=2)
+
+
+
 
 # Adding resources 
 # @mcp.resource("papers://folders")
