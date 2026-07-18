@@ -70,7 +70,7 @@ class MCP_ChatBot:
 
        
         self.llm = ChatOpenAI(
-            model="nvidia/nemotron-3-ultra-550b-a55b",   # Target a solid open-weights model
+            model="mistralai/mistral-medium-3.5-128b",   # Target a solid open-weights model
             openai_api_base="https://integrate.api.nvidia.com/v1",   #"https://openrouter.ai/api/v1",  # Connect directly to OpenRouter 
             openai_api_key=openai_key,
             max_tokens=2024,
