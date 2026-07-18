@@ -299,10 +299,11 @@ async def extract_info(paper_ids: List[str]) -> str:
         conn = get_conn()
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT title, authors, summary, pdf_url, published FROM papers WHERE paper_id = %s",
+                "SELECT title, authors, summary, pdf_url, published FROM papers WHERE paper_id = ANY(%s)",
                 (paper_ids,)
             )
-            row = cur.fetchone()
+            #row = cur.fetchone()
+            rows = cur.fetchall()
         conn.close()
         return row
    
