@@ -287,15 +287,20 @@ def _insert_papers_sync(papers_info: dict, topic: str):
 #     return f"There's no saved information related to paper {paper_id}."
 
 
+
+#async def extract_info(paper_id: str) -> str:
 @mcp.tool()
-async def extract_info(paper_id: str) -> str:
+async def extract_info(paper_ids: List[str]) -> str:
 
     def _fetch():
+        if not paper_ids:
+            return []
+
         conn = get_conn()
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT title, authors, summary, pdf_url, published FROM papers WHERE paper_id = %s",
-                (paper_id,)
+                (paper_ids,)
             )
             row = cur.fetchone()
         conn.close()
@@ -303,14 +308,31 @@ async def extract_info(paper_id: str) -> str:
    
     row = await asyncio.to_thread(_fetch)
     if not row:
-        return f"There's no saved information related to paper {paper_id}."
+        return f"There's no saved information related to paper {paper_ids}."
+    found_ids = {r[0] for r in row}
+    not_found = [pid for pid in paper_ids if pid not in found_ids]
 
+    papers_list = []
+    for r in row:
+        papers_list.append({
+            "paper_id": r[0],
+            "title": r[1],
+            "authors": r[2],
+            "summary": r[3],
+            "pdf_url": r[4],
+            "published": r[5]
+        })
+
+    # return json.dumps({
+    #     "title": row[0],
+    #     "authors": row[1],
+    #     "summary": row[2],
+    #     "pdf_url": row[3],
+    #     "published": row[4],
+    # }, indent=2)
     return json.dumps({
-        "title": row[0],
-        "authors": row[1],
-        "summary": row[2],
-        "pdf_url": row[3],
-        "published": row[4],
+        "papers": papers_list,
+        "not_found": not_found
     }, indent=2)
 
 # Adding resources 
