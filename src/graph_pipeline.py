@@ -555,17 +555,19 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                 None
             )
             if last_tool:
-                try:
-                    content = last_tool.content
-                    if isinstance(content,list):
-                        content = next( (b["text"] for b in content if isinstance(b,dict) and b.get("type") == "text"),"")
+                #try:
+                    # content = last_tool.content
+                    # if isinstance(content,list):
+                    #     content = next( (b["text"] for b in content if isinstance(b,dict) and b.get("type") == "text"),"")
                         
-                    data = json.loads(content)
+                    # data = json.loads(content)
+                data = parse_mcp_content(last_tool.content)
+                if data is not None:
                     results = data.get("results", data.get("papers", []))
                     if len(results) == 0:
                         new_retry_count += 1
-                except (json.JSONDecodeError, AttributeError):
-                    pass    
+                # except (json.JSONDecodeError, AttributeError):
+                #     pass    
             
             if not draft:
                 logger.warning("--- RUN_AGENT: LLM returned empty content ---")
@@ -603,11 +605,13 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
         last_tool_msg = next((m for m in reversed(messages) if isinstance(m, ToolMessage)), None)
         
         if last_tool_msg:
-            try:
-                content = last_tool_msg.content
-                if isinstance(content, list):
-                    content = next((b["text"] for b in content if isinstance(b, dict) and b.get("type") == "text"), "")
-                data = json.loads(content)
+            # try:
+            #     content = last_tool_msg.content
+            #     if isinstance(content, list):
+            #         content = next((b["text"] for b in content if isinstance(b, dict) and b.get("type") == "text"), "")
+            #     data = json.loads(content)
+            data = parse_mcp_content(last_tool_msg.content)
+            if data is not None:
                 
                 # Check for 'insufficient' verdict OR completely empty results list
                 verdict = data.get("evaluator_verdict", {})
@@ -618,8 +622,8 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                 if is_bad and state["retry_count"] < MAX_RETRIES:
                     logger.info(f"--- LOOP: Search results insufficient. Retrying agent. ---")
                     return "retry"
-            except:
-                pass # Not JSON or unexpected format, move to citation check
+            # except:
+            #     pass # Not JSON or unexpected format, move to citation check
 
         return "ok"
     

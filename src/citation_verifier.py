@@ -3,6 +3,7 @@ import json
 import sys
 import logging
 from langchain_core.messages import ToolMessage
+from mcp_content import parse_mcp_content
 
 logger = logging.getLogger("RAG-Chatbot")
 
@@ -72,20 +73,22 @@ def extract_real_papers_from_tool_results(messages: list) -> dict:
     for msg in messages:
         if not isinstance(msg, ToolMessage):
             continue
-        try:
-            content = msg.content
-            if isinstance(content, list):
-                content = next((b["text"] for b in content if isinstance(b, dict) and b.get("type") == "text"), "")
+        # try:
+        #     content = msg.content
+        #     if isinstance(content, list):
+        #         content = next((b["text"] for b in content if isinstance(b, dict) and b.get("type") == "text"), "")
                 
-            data = json.loads(content)
-            
+        #     data = json.loads(content)
+        if getattr(msg, "name", None) != "extract_info":
+            continue
+        data = parse_mcp_content(msg.content)
             # Handle new plural shape: {"papers": [{"paper_id": "...", "title": "..."}, ...]}
-            if isinstance(data, dict) and "papers" in data:
-                for p in data["papers"]:
-                    if isinstance(p, dict) and "paper_id" in p and "title" in p:
-                        real_papers[_strip_version(p["paper_id"])] = p["title"]
-        except (json.JSONDecodeError, AttributeError, StopIteration):
-            pass
+        if isinstance(data, dict) and "papers" in data:
+            for p in data["papers"]:
+                if isinstance(p, dict) and "paper_id" in p and "title" in p:
+                    real_papers[_strip_version(p["paper_id"])] = p["title"]
+        # except (json.JSONDecodeError, AttributeError, StopIteration):
+        #     pass
 
     # Step 2: Fallback to old singular extract_info shape matching for backward compatibility
     extract_info_map = {}
@@ -103,32 +106,36 @@ def extract_real_papers_from_tool_results(messages: list) -> dict:
         paper_id = extract_info_map.get(msg.tool_call_id)
         if not paper_id:
             continue
-        try:
-            content = msg.content
-            if isinstance(content, list):
-                content = next((b["text"] for b in content if isinstance(b, dict) and b.get("type") == "text"), "")
-            data = json.loads(content)
+        # try:
+        #     content = msg.content
+        #     if isinstance(content, list):
+        #         content = next((b["text"] for b in content if isinstance(b, dict) and b.get("type") == "text"), "")
+        #     data = json.loads(content)
+        data = parse_mcp_content(msg.content)
+        if isinstance(data, dict):
             title = data.get("title", "")
             if title:
                 real_papers[_strip_version(paper_id)] = title
-        except (json.JSONDecodeError, AttributeError, StopIteration):
-            pass
+        # except (json.JSONDecodeError, AttributeError, StopIteration):
+        #     pass
 
     # Step 3: Extract from search_papers & hybrid_search_papers results
     for msg in messages:
         if not isinstance(msg, ToolMessage):
             continue
-        try:
-            content = msg.content
-            if isinstance(content, list):
-                content = next((b["text"] for b in content if isinstance(b, dict) and b.get("type") == "text"), "")
-            data = json.loads(content)
+        # try:
+        #     content = msg.content
+        #     if isinstance(content, list):
+        #         content = next((b["text"] for b in content if isinstance(b, dict) and b.get("type") == "text"), "")
+        #     data = json.loads(content)
+        data = parse_mcp_content(msg.content)
+        if isinstance(data, dict):
             papers = data.get("results", data.get("papers", []))
             for p in papers:
                 if isinstance(p, dict) and "paper_id" in p and "title" in p:
                     real_papers[_strip_version(p["paper_id"])] = p["title"]
-        except (json.JSONDecodeError, AttributeError, StopIteration):
-            pass
+        # except (json.JSONDecodeError, AttributeError, StopIteration):
+        #     pass
 
     logger.info(f"--- CITATION VERIFIER: real_papers extracted = {list(real_papers.keys())}")
     return real_papers
