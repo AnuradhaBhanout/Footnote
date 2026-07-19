@@ -258,7 +258,10 @@ class MCP_ChatBot:
      
 
     async def _rebuild_agent(self):
-        tool_names_str =  ", ".join([t.name for t in self.available_tools])
+        # tool_names_str =  ", ".join([t.name for t in self.available_tools])
+        search_tools = [t for t in self.available_tools if t.name != "extract_info"]
+        tool_names_str = ", ".join([t.name for t in search_tools])
+        
         self.agent = create_agent(
             model = self.llm,
             tools=self.available_tools + [ask_clarification],
