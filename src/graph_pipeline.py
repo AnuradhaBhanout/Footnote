@@ -500,6 +500,8 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
 
 # --- deterministic extract_info: never left to the model ---
             paper_ids = _collect_paper_ids_from_search(agent_messages)
+            logger.info(f"--- DEBUG: collected paper_ids={paper_ids}, raw tool messages={[(type(m.content).__name__, repr(m.content)[:200]) for m in agent_messages if isinstance(m, ToolMessage)]} ---")
+            extract_ran = False
             if paper_ids:
                 extract_tool = next((t for t in chatbot.available_tools if t.name == "extract_info"), None)
                 if extract_tool is not None:
@@ -519,9 +521,18 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                         )]
                         final_response = await chatbot.llm.ainvoke(final_pass,config= config)
                         agent_messages = agent_messages + [final_response]
+                        extract_ran = True
                     except Exception as e:
                         logger.error(f"run_agent: deterministic extract_info failed: {type(e).__name__}: {e}")
                         # fall through — agent_messages keeps whatever the search-only agent already wrote
+            if not extract_ran:
+                # covers both "nothing found" and "extract_info call failed" —
+                # never let the search-agent's "gathering details" placeholder
+                # reach the user as a final answer
+                agent_messages = agent_messages + [AIMessage(content=(
+                    "I searched but couldn't find papers matching that in your saved library. "
+                    "Could you try different terms, or ask me to search again?"
+                ))]
 
             final = agent_messages[-1]
             draft = final.content if final.content else ""
