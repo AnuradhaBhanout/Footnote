@@ -8,6 +8,7 @@ from openai import APIError
 import anyio
 from mcp.shared.exceptions import McpError
 from langgraph.errors import GraphRecursionError
+from langchain_core.runnables import RunnableConfig
 
 import httpx
 import os
@@ -50,6 +51,36 @@ ACTION_TOOL_NAMES = {"write_file","edit_file","create_directory","move_file","fe
 # Write any carifiying question in plain, friendly language - do not assume the user knows technical jargon or this system's internal terms.
 
 # """
+
+
+def _collect_paper_ids_from_search(messages: list) -> list[str]:
+    """Pull every paper_id out of search_papers / hybrid_search_papers tool results,
+    deduped, in order. Used to drive a single deterministic extract_info call —
+    never left to the model to decide how many times to call it."""
+    ids = []
+    for msg in messages:
+        if not isinstance(msg, ToolMessage):
+            continue
+        try:
+            content = msg.content
+            if isinstance(content, list):
+                content = next((b["text"] for b in content if isinstance(b, dict) and b.get("type") == "text"), "")
+            data = json.loads(content)
+        except (json.JSONDecodeError, AttributeError):
+            continue
+
+        if isinstance(data, dict) and "results" in data:      # hybrid_search_papers
+            ids.extend(r["paper_id"] for r in data.get("results", []) if isinstance(r, dict) and "paper_id" in r)
+        elif isinstance(data, list):                            # search_papers: bare list of IDs
+            ids.extend(pid for pid in data if isinstance(pid, str))
+
+    seen, out = set(), []
+    for pid in ids:
+        if pid not in seen:
+            seen.add(pid)
+            out.append(pid)
+    return out
+
 
 
 def _parse_tool_result(result) -> dict:
@@ -350,7 +381,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
 
     #         finally:
     #             await chatbot.release_agent()
-    async def run_agent(state: GraphState) -> GraphState:
+    async def run_agent(state: GraphState ,config: RunnableConfig) -> GraphState:
         logger.info(f"--- NODE START: run_agent with query: {state['current_query']} ---")
         try:
             messages = state["messages"]
@@ -374,7 +405,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                     await chatbot.release_agent()
 
             try:
-                agent_state = await call_agent(20)
+                agent_state = await call_agent(8)  #20
 
             except GraphRecursionError:
                 logger.error("run_agent: hit internal recursion limit — agent looped without converging")
@@ -390,7 +421,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                     chatbot.reconnect_event.set()
                     await chatbot.ready_event.wait()
                     try:
-                        agent_state = await call_agent(22)
+                        agent_state = await call_agent(10)   #22
                         break
                     except (anyio.ClosedResourceError, McpError) as e:
                         if attempt == 1:
@@ -404,7 +435,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
             except httpx.ReadTimeout:
                 logger.warning("run_agent: NVIDIA stream stalled, retrying once")
                 try:
-                    agent_state = await call_agent(25)
+                    agent_state = await call_agent(10)  #25
                 except Exception as e2:
                     logger.error(f"run_agent: retry after timeout also failed: {type(e2).__name__}: {e2}")
                     return {**state,
@@ -416,7 +447,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                 if "tool call validation failed" in str(e) or "Failed to call a function" in str(e):
                     logger.warning(f"Malformed tool call, retrying once: {e}")
                     try:
-                        agent_state = await call_agent(55)
+                        agent_state = await call_agent(15)  #55
                     except Exception as e2:
                         logger.error(f"run_agent: retry also failed: {type(e2).__name__}: {e2}")
                         return {**state,
@@ -467,9 +498,35 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                     }
 
 
+# --- deterministic extract_info: never left to the model ---
+            paper_ids = _collect_paper_ids_from_search(agent_messages)
+            if paper_ids:
+                extract_tool = next((t for t in chatbot.available_tools if t.name == "extract_info"), None)
+                if extract_tool is not None:
+                    try:
+                        raw = await extract_tool.ainvoke({"paper_ids": paper_ids},config = config)
+                        result = _parse_tool_result(raw)
+                        extract_msg = ToolMessage(
+                            content=json.dumps(result),
+                            tool_call_id="deterministic-extract-info",
+                            name="extract_info",
+                        )
+                        agent_messages = agent_messages + [extract_msg]
 
-            final = agent_state["messages"][-1]
+                        final_pass = agent_messages + [HumanMessage(
+                            content="Using ONLY the paper details returned above, write your final "
+                                    "plain-language summary now. Do not call any tools."
+                        )]
+                        final_response = await chatbot.llm.ainvoke(final_pass,config= config)
+                        agent_messages = agent_messages + [final_response]
+                    except Exception as e:
+                        logger.error(f"run_agent: deterministic extract_info failed: {type(e).__name__}: {e}")
+                        # fall through — agent_messages keeps whatever the search-only agent already wrote
+
+            final = agent_messages[-1]
             draft = final.content if final.content else ""
+            # final = agent_state["messages"][-1]
+            #draft = final.content if final.content else ""
             logger.info("--- NODE END: run_agent completed ---")
 
             #new_retry_count = state["retry_count"]
@@ -499,7 +556,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                 logger.warning("--- RUN_AGENT: LLM returned empty content ---")
             return {
                 **state,
-                "messages":agent_state["messages"],
+                "messages":agent_messages,  #agent_state["messages"],
                 "draft_answer": draft,
                 "clarification_question": None,
                 "clarification_options": [],
