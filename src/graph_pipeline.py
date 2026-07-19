@@ -9,6 +9,7 @@ import anyio
 from mcp.shared.exceptions import McpError
 from langgraph.errors import GraphRecursionError
 from langchain_core.runnables import RunnableConfig
+from mcp_content import parse_mcp_content
 
 import httpx
 import os
@@ -61,12 +62,15 @@ def _collect_paper_ids_from_search(messages: list) -> list[str]:
     for msg in messages:
         if not isinstance(msg, ToolMessage):
             continue
-        try:
-            content = msg.content
-            if isinstance(content, list):
-                content = next((b["text"] for b in content if isinstance(b, dict) and b.get("type") == "text"), "")
-            data = json.loads(content)
-        except (json.JSONDecodeError, AttributeError):
+        # try:
+        #     content = msg.content
+        #     if isinstance(content, list):
+        #         content = next((b["text"] for b in content if isinstance(b, dict) and b.get("type") == "text"), "")
+        #     data = json.loads(content)
+        # except (json.JSONDecodeError, AttributeError):
+        #     continue
+        data = parse_mcp_content(msg.content)
+        if data is None:
             continue
 
         if isinstance(data, dict) and "results" in data:      # hybrid_search_papers
