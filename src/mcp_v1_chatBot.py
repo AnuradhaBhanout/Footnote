@@ -45,6 +45,7 @@ from  langchain_mcp_adapters.tools import convert_mcp_tool_to_langchain_tool
 _ = load_dotenv(find_dotenv())
 
 openai_key = os.getenv("OPENAI_API_KEY")
+nvidia_key = os.getenv("NVIDIA_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 @tool
@@ -71,7 +72,7 @@ class MCP_ChatBot:
        
         self.llm = ChatOpenAI(
             model="deepseek-ai/deepseek-v4-flash",   # Target a solid open-weights model
-            openai_api_base="https://integrate.api.nvidia.com/v1",   #"https://openrouter.ai/api/v1",  # Connect directly to OpenRouter 
+            openai_api_base="https://openrouter.ai/api/v1", #"https://integrate.api.nvidia.com/v1",     # Connect directly to OpenRouter 
             openai_api_key=openai_key,
             max_tokens=2024,
             max_retries=1,
