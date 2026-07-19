@@ -21,7 +21,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv,find_dotenv
 
 from contextlib import asynccontextmanager
-from citation_verifier import extract_real_papers_from_tool_results, ARXIV_ID_PATTERN
+from citation_verifier import extract_real_papers_from_tool_results, ARXIV_ID_PATTERN,_strip_version
 
 load_dotenv(find_dotenv())
 
@@ -232,10 +232,10 @@ async def chat(request: ChatRequest):
 
             citation_passed = state.values.get("citation_check_passed", False)
             real_papers = extract_real_papers_from_tool_results(state.values.get("messages", []))
-            cited_in_text = set(ARXIV_ID_PATTERN.findall(answer))
+            cited_in_text ={_strip_version(pid) for pid in ARXIV_ID_PATTERN.findall(answer)}   # set(ARXIV_ID_PATTERN.findall(answer))
             cited_ids = [pid for pid in cited_in_text if pid in real_papers] if citation_passed else []
 
-            yield sse_event("done",{
+            yield sse_event("done",{    
                 "answer": answer,
                 "session_id": session_id,
                 "cited_paper_ids": cited_ids,
