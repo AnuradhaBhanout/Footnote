@@ -232,8 +232,8 @@ async def chat(request: ChatRequest):
 
             citation_passed = state.values.get("citation_check_passed", False)
             real_papers = extract_real_papers_from_tool_results(state.values.get("messages", []))
-            cited_in_text ={_strip_version(pid) for pid in ARXIV_ID_PATTERN.findall(answer)}   # set(ARXIV_ID_PATTERN.findall(answer))
-            cited_ids = [pid for pid in cited_in_text if pid in real_papers] if citation_passed else []
+            cited_in_text =set(ARXIV_ID_PATTERN.findall(answer))
+            cited_ids = [pid for pid in cited_in_text if _strip_version(pid) in real_papers] if citation_passed else []
 
             yield sse_event("done",{    
                 "answer": answer,
