@@ -563,7 +563,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                     # data = json.loads(content)
                 data = parse_mcp_content(last_tool.content)
                 if data is not None:
-                    results = data.get("results", data.get("papers", []))
+                    results = data.get("results", data.get("papers", [])) if isinstance(data, dict) else data
                     if len(results) == 0:
                         new_retry_count += 1
                 # except (json.JSONDecodeError, AttributeError):
@@ -615,7 +615,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                 
                 # Check for 'insufficient' verdict OR completely empty results list
                 verdict = data.get("evaluator_verdict", {})
-                results = data.get("results", data.get("papers", []))
+                results = data.get("results", data.get("papers", [])) if isinstance(data, dict) else data
                 
                 is_bad = verdict.get("sufficient") is False or len(results) == 0
                 
