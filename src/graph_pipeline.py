@@ -121,6 +121,7 @@ class GraphState(TypedDict):
     clarification_question: Optional[str]
     clarification_options: list
     answer_is_reliable: bool
+    fetched_papers: list 
 
 
 @retry(
