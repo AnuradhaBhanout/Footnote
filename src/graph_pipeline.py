@@ -387,6 +387,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
     #             await chatbot.release_agent()
     async def run_agent(state: GraphState ,config: RunnableConfig) -> GraphState:
         logger.info(f"--- NODE START: run_agent with query: {state['current_query']} ---")
+        state = {**state, "fetched_papers": state.get("fetched_papers", [])}
         try:
             messages = state["messages"]
 
@@ -512,6 +513,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                     try:
                         raw = await extract_tool.ainvoke({"paper_ids": paper_ids},config = config)
                         result = _parse_tool_result(raw)
+                        fetched_papers = result.get("papers", []) if isinstance(result, dict) else []
                         extract_msg = ToolMessage(
                             content=json.dumps(result),
                             tool_call_id="deterministic-extract-info",
@@ -579,6 +581,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                 "clarification_options": [],
                 "retry_count": new_retry_count,
                 "answer_is_reliable": bool(draft),
+                "fetched_papers": fetched_papers if extract_ran else [],
                     }
         
         except Exception as e:
