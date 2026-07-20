@@ -115,7 +115,7 @@ mcp = FastMCP("research", host="0.0.0.0", port=port)
 
 #Call LLM for dynamic search across all saved papers on disk using hybrid search architecture.
 @mcp.tool()
-async def hybrid_search_papers(query: str,top_k: int = 5,alpha: float = 0.5)->List[dict]:
+async def hybrid_search_papers(query: str,top_k: int = 5,alpha: float = 0.5)-> dict:
     
     """
     Search ALL previously saved papers using hybrid retrieval (BM25 + embeddings),
