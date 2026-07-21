@@ -155,6 +155,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                          "cache_hit": True,
                          "draft_answer": result["answer"],
                          "fetched_papers": result.get("fetched_papers", []),
+                         "citation_check_passed": True,
                          }
         except Exception as e:
             logger.error(f"Cache check failed:{type(e).__name__}: {e}")
