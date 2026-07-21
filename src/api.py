@@ -240,6 +240,7 @@ async def chat(request: ChatRequest):
                 "answer": answer,
                 "session_id": session_id,
                 "cited_paper_ids": cited_ids,
+                "fetched_papers": fetched_papers,
             })
         
         except Exception as e:
@@ -323,6 +324,7 @@ async def resume(request: ResumeRequest):
                 "answer": answer,
                 "session_id": request.session_id,
                 "cited_paper_ids": cited_ids,
+                "fetched_papers": fetched_papers,
             })
         
         except Exception as e:
