@@ -298,7 +298,8 @@ class MCP_ChatBot:
         #     "Provide ONLY the final answer. Do NOT include reasoning or internal thoughts."
         #     )                       
         # )
-        search_tools = [t for t in self.available_tools if t.name != "extract_info"]
+        EXCLUDED_FROM_AGENT = {"extract_info", "check_semantic_cache", "store_semantic_cache"}
+        search_tools = [t for t in self.available_tools if t.name not in EXCLUDED_FROM_AGENT]
         tool_names_str = ", ".join([t.name for t in search_tools])
 
         self.agent = create_agent(
