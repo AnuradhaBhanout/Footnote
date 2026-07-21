@@ -151,7 +151,11 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
             raw = await cache_check_tool.ainvoke({"query": state["original_query"]})
             result = _parse_tool_result(raw)
             if result.get("hit"):
-                return {**state, "cache_hit": True, "draft_answer": result["answer"]}
+                return {**state, 
+                         "cache_hit": True,
+                         "draft_answer": result["answer"],
+                         "fetched_papers": result.get("fetched_papers", []),
+                         }
         except Exception as e:
             logger.error(f"Cache check failed:{type(e).__name__}: {e}")
 
@@ -693,7 +697,8 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                         await cache_store_tool.ainvoke(
                             {
                                 "query":state["original_query"],
-                                "answer":state["draft_answer"]
+                                "answer":state["draft_answer"],
+                                "fetched_papers": state.get("fetched_papers", []),
                             }
                         )
             except Exception as e:

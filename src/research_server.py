@@ -487,15 +487,16 @@ async def check_semantic_cache(query: str) -> dict:
         return{
             "hit":True,
             "answer":hit["answer"],
-            "similarity": hit["similarity"]
+            "similarity": hit["similarity"],
+            "fetched_papers": hit.get("fetched_papers", []),
         }
-    return{"hit":False,"answer":None}
+    return{"hit":False,"answer":None,"fetched_papers":[]}
 
 @mcp.tool()
-async def store_semantic_cache(query: str, answer: str)-> dict:
+async def store_semantic_cache(query: str, answer: str, fetched_papers: List[dict] = None)-> dict:
     """Store a verified answer in the semantic cache for furture similar questions."""
     corpus_version = SemanticCache.corpus_version(_hybrid_index.paper_ids)
-    await asyncio.to_thread(_semantic_cache.store, query, answer, corpus_version)
+    await asyncio.to_thread(_semantic_cache.store, query, answer, corpus_version, fetched_papers)
     return {"stored":True}
 
 

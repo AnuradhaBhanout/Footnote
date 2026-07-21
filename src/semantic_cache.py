@@ -4,6 +4,7 @@ import hashlib
 import time 
 import numpy as np
 from db import get_conn
+import json
 
 
 SIMILARITY_THRESHOLD = 0.92
@@ -35,7 +36,7 @@ class SemanticCache:
             conn = get_conn()
             with conn.cursor() as cur:
                 cur.execute("""
-                            SELECT query, answer, embedding, corpus_version, created_at
+                            SELECT query, answer, embedding, corpus_version, fetched_papers, created_at
                             FROM semantic_cache ORDER BY created_at ASC;
                             """)
                 rows = cur.fetchall()
@@ -47,7 +48,8 @@ class SemanticCache:
                     "answer": r[1],
                     "embedding": np.array(r[2],dtype = np.float32),
                     "corpus_version": r[3],
-                    "created_at": r[4].timestamp() if r[4] else time.time(),
+                    "fetched_papers": r[4] if r[4] is not None else [],
+                    "created_at": r[5].timestamp() if r[5] else time.time(),
                 }
                 for r in rows
             ]
@@ -65,9 +67,9 @@ class SemanticCache:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO semantic_cache (query, answer, embedding, corpus_version)
+                    INSERT INTO semantic_cache (query, answer, embedding, corpus_version, fetched_papers)
                     
-                    VALUES(%s, %s, %s::vector, %s)
+                    VALUES(%s, %s, %s::vector, %s, %s::jsonb)
 
                     """,
                     (
@@ -75,6 +77,7 @@ class SemanticCache:
                         entry["answer"],
                         entry["embedding"].tolist(),
                         entry["corpus_version"],
+                        json.dumps(entry.get("fetched_papers", [])),
                     ),
                 )
         conn.close()
@@ -112,12 +115,16 @@ class SemanticCache:
                 best_entry = entry
 
         if best_entry is not None and best_score >= SIMILARITY_THRESHOLD:
-                return {"answer": best_entry["answer"],"matched_query": best_entry["query"],"similarity": best_score}
+                return {"answer": best_entry["answer"],
+                        "matched_query": best_entry["query"],
+                        "similarity": best_score,
+                        "fetched_papers": best_entry.get("fetched_papers", []),
+                        }
 
         return None
 
 
-    def store(self, query: str, answer: str, current_corpus_version: str) -> None:
+    def store(self, query: str, answer: str, current_corpus_version: str, fetched_papers: list = None) -> None:
 
         query_vec = self.model.encode([query],convert_to_numpy = True,normalize_embeddings = True)[0]
         #query_vec = list(self.model.embed([query]))[0]
@@ -128,6 +135,7 @@ class SemanticCache:
                 "query": query,
                 "answer": answer,
                 "corpus_version": current_corpus_version, # state of the library
+                "fetched_papers": fetched_papers or [],
                 "created_at": time.time(),
             }
         

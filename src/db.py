@@ -53,6 +53,7 @@ def init_db():
                         answer             TEXT        NOT NULL,
                         embedding          vector(384) NOT NULL,
                         corpus_version     TEXT        NOT NULL,
+                        fetched_papers     JSONB       DEFAULT '[]'::jsonb,
                         created_at         TIMESTAMP   DEFAULT NOW()
                         );
                   """)
