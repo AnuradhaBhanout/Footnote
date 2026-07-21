@@ -150,6 +150,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
             
             raw = await cache_check_tool.ainvoke({"query": state["original_query"]})
             result = _parse_tool_result(raw)
+            logger.info(f"--- CACHE DEBUG: raw={repr(raw)[:300]}, parsed result={result} ---")
             if result.get("hit"):
                 return {**state, 
                          "cache_hit": True,
