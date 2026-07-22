@@ -1,7 +1,7 @@
 {
     "mcpServers": {
         "research": {
-           "url": "https://ragchatbot-research.onrender.com/sse"
+            "url": "https://ragchatbot-research.onrender.com/sse"
         }
     }
 }
