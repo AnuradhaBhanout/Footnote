@@ -587,7 +587,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                 "clarification_question": None,
                 "clarification_options": [],
                 "retry_count": new_retry_count,
-                "answer_is_reliable": bool(draft),
+                "answer_is_reliable": extract_ran, #bool(draft),
                 "fetched_papers": fetched_papers if extract_ran else [],
                     }
         
