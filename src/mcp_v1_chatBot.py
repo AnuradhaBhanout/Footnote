@@ -364,7 +364,8 @@ class MCP_ChatBot:
             open=False,
         )
         await self._pg_pool.open()
-        self.checkpointer = AsyncPostgresSaver(self._pg_conn)
+        #self.checkpointer = AsyncPostgresSaver(self._pg_conn)
+        self.checkpointer = AsyncPostgresSaver(self._pg_pool)
 
         await self.checkpointer.setup()     #Creates a Langgraph checkpoint tables on first run
         self.app = graph.compile(checkpointer=self.checkpointer)
