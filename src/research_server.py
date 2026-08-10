@@ -501,10 +501,23 @@ async def store_semantic_cache(query: str, answer: str, fetched_papers: List[dic
 
 
 
+# async def health(request):
+#     from starlette.responses import JSONResponse
+#     return JSONResponse({"status": "ok"})
+
 @mcp.custom_route("/health", methods=["GET"])
 async def health(request):
     from starlette.responses import JSONResponse
-    return JSONResponse({"status": "ok"})
+    db_ok = False
+    try:
+        conn = get_conn()
+        conn.cursor().execute("SELECT 1")
+        conn.close()
+        db_ok = True
+    except Exception:
+        pass
+    return JSONResponse({"status": "ok", "db": db_ok})
+
 
 
 if __name__ == "__main__":
