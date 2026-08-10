@@ -7,6 +7,7 @@ from db import get_conn
 import json
 
 
+
 SIMILARITY_THRESHOLD = 0.92
 
 class SemanticCache:
