@@ -22,6 +22,12 @@ def init_db():
     """"Create required table and extensions if they dont exist.
     call once at server startup(research_server.py)
     """
+    conn = psycopg2.connect(DATABASE_URL,connect_timeout=10)
+    with conn:
+        with conn.cursor() as cur:
+            cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+    conn.close()
+
     conn = get_conn()
     with conn:
         with conn.cursor() as cur:
