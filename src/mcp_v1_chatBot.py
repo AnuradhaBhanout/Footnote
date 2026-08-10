@@ -28,6 +28,12 @@ from graph_pipeline import build_graph
 import uuid
 import logging
 import selectors
+from psycopg_pool import AsyncConnectionPool
+
+
+
+
+
 os.makedirs("logs", exist_ok=True)
 # Configure logging to write to debug.log
 logging.basicConfig(
@@ -156,7 +162,8 @@ class MCP_ChatBot:
         except asyncio.CancelledError:
             await self.exit_stack.aclose()
             if self._pg_conn:
-                await self._pg_conn.close()
+                #await self._pg_conn.close()
+                await self._pg_pool.close()
             raise 
             
     async def _connect_with_retry(self,attempts: int = 4, delay: float=3.0):
@@ -348,7 +355,15 @@ class MCP_ChatBot:
 
         graph = build_graph(self.llm,self)#,cache_check,cache_store)
 
-        self._pg_conn = await psycopg.AsyncConnection.connect(DATABASE_URL,autocommit=True)
+        #self._pg_conn = await psycopg.AsyncConnection.connect(DATABASE_URL,autocommit=True)
+        self._pg_pool = AsyncConnectionPool(
+            DATABASE_URL,
+            min_size=1,
+            max_size=5,
+            kwargs={"autocommit": True},
+            open=False,
+        )
+        await self._pg_pool.open()
         self.checkpointer = AsyncPostgresSaver(self._pg_conn)
 
         await self.checkpointer.setup()     #Creates a Langgraph checkpoint tables on first run
@@ -644,7 +659,8 @@ class MCP_ChatBot:
     async def cleanup(self):
         """Cleanly close all resources """
         if hasattr(self, '_pg_conn'):
-            await self._pg_conn.close()      #Close Postgres connection
+            #await self._pg_conn.close()      #Close Postgres connection
+            await self._pg_pool.close()
         await self.exit_stack.aclose()   # Close MCP server subprocess
 
 
