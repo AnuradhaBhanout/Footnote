@@ -11,7 +11,10 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 def get_conn():
     """Return a psycopg2 connection with pgvectortype registered."""
     conn = psycopg2.connect(DATABASE_URL,connect_timeout = 10)
-    register_vector(conn)
+    try:
+       register_vector(conn)
+    except psycopg2.ProgrammingError:
+        conn.rollback()
     return conn
 
 
