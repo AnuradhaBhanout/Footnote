@@ -340,7 +340,20 @@ async def resume(request: ResumeRequest):
         },
     )
 
+# @app.get("/health")
+# async def health():
+#     return {"status":"ok",
+#             "ready":"chatbot" in _app_state}
+
 @app.get("/health")
 async def health():
-    return {"status":"ok",
-            "ready":"chatbot" in _app_state}
+    chatbot = _app_state.get("chatbot")
+    db_ok = False
+    if chatbot and hasattr(chatbot, "_pg_pool"):
+        try:
+            async with chatbot._pg_pool.connection() as conn:
+                await conn.execute("SELECT 1")
+            db_ok = True
+        except Exception:
+            db_ok = False
+    return {"status": "ok", "ready": chatbot is not None and chatbot.ready_event.is_set(), "db": db_ok}
