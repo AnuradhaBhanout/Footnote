@@ -184,78 +184,79 @@ async def chat(request: ChatRequest):
         handler = CallbackHandler()
         with  langfuse.start_as_current_observation(as_type="span",name="chat-request") as span, \
             propagate_attributes(session_id=session_id,user_id=session_id,tags=["chat"]):
-           config = {"configurable":{"thread_id": session_id},"callbacks":[handler]}
-        try:
-            async for event in chatbot.app.astream_events(
-                {
-                    "original_query": request.query,
-                    "current_query": request.query,
-                    "messages": [],
-                    "retry_count": 0,
-                },
-                config,
-                version="v2"
-            ):
-                kind = event["event"]
-                name = event.get("name","")
+            config = {"configurable":{"thread_id": session_id},"callbacks":[handler]}
+            try:
+                async for event in chatbot.app.astream_events(
+                    {
+                        "original_query": request.query,
+                        "current_query": request.query,
+                        "messages": [],
+                        "retry_count": 0,
+                    },
+                    config,
+                    version="v2"
+                ):
+                    kind = event["event"]
+                    name = event.get("name","")
+                    
+
+                    if kind == "on_tool_start":
+                        yield sse_event("tool_start",{
+                            "tool": name,
+                            "input": event.get("data", {}).get("input",{}),
+                        })
+
+                    elif kind == "on_tool_end":
+                        output = format_tool_output(name, event.get("data",{}).get("output",""))
+                        input_args = event.get("data",{}).get("input",{})
+                        yield sse_event("tool_end",{
+                            "tool":name,
+                            "output":output,
+                            "input": input_args,
+                        })
+            
+                    elif kind == "on_chat_model_stream":
+                        chunk = event.get("data",{}).get("chunk")
+                        if chunk and hasattr(chunk,"content") and chunk.content:
+                            yield sse_event("token",{"content": chunk.content})
+
+                    
+                
+
+                    
+                state = await chatbot.app.aget_state(config)
+                
+                # on graph interrupt (triage)
+                if state.next:
+                    interrupt_data = state.tasks[0].interrupts[0].value
+                    yield sse_event("interrupt",{
+                        "question": interrupt_data.get("question", "Could you please specify?"),
+                        "options": interrupt_data.get("options",[]),
+                        "session_id": session_id,
+                    })
+                    return        # pause
+                
+                answer = state.values.get("draft_answer","")
+
+                citation_passed = state.values.get("citation_check_passed", False)
+                # real_papers = extract_real_papers_from_tool_results(state.values.get("messages", []))
+                # cited_in_text =set(ARXIV_ID_PATTERN.findall(answer))
+                fetched_papers = state.values.get("fetched_papers", [])
+                cited_ids = [pid["paper_id"] for pid in fetched_papers if isinstance(pid,dict) and "paper_id" in pid] if citation_passed else []
+
                 trace_id = span.trace_id
-
-                if kind == "on_tool_start":
-                    yield sse_event("tool_start",{
-                        "tool": name,
-                        "input": event.get("data", {}).get("input",{}),
-                    })
-
-                elif kind == "on_tool_end":
-                    output = format_tool_output(name, event.get("data",{}).get("output",""))
-                    input_args = event.get("data",{}).get("input",{})
-                    yield sse_event("tool_end",{
-                        "tool":name,
-                        "output":output,
-                        "input": input_args,
-                    })
-         
-                elif kind == "on_chat_model_stream":
-                    chunk = event.get("data",{}).get("chunk")
-                    if chunk and hasattr(chunk,"content") and chunk.content:
-                        yield sse_event("token",{"content": chunk.content})
-
-                
-               
-
-                
-            state = await chatbot.app.aget_state(config)
-            
-            # on graph interrupt (triage)
-            if state.next:
-                interrupt_data = state.tasks[0].interrupts[0].value
-                yield sse_event("interrupt",{
-                    "question": interrupt_data.get("question", "Could you please specify?"),
-                    "options": interrupt_data.get("options",[]),
+                yield sse_event("done",{    
+                    "answer": answer,
                     "session_id": session_id,
+                    "cited_paper_ids": cited_ids,
+                    "fetched_papers": fetched_papers,
+                    "trace_id": trace_id,
                 })
-                return        # pause
             
-            answer = state.values.get("draft_answer","")
-
-            citation_passed = state.values.get("citation_check_passed", False)
-            # real_papers = extract_real_papers_from_tool_results(state.values.get("messages", []))
-            # cited_in_text =set(ARXIV_ID_PATTERN.findall(answer))
-            fetched_papers = state.values.get("fetched_papers", [])
-            cited_ids = [pid["paper_id"] for pid in fetched_papers if isinstance(pid,dict) and "paper_id" in pid] if citation_passed else []
-
-            yield sse_event("done",{    
-                "answer": answer,
-                "session_id": session_id,
-                "cited_paper_ids": cited_ids,
-                "fetched_papers": fetched_papers,
-                "trace_id": trace_id,
-            })
-        
-        except Exception as e:
-            logger.error(f"Stream error: {e}", exc_info=True)
-            user_message = "Something went wrong processing your request. Please try again."
-            yield sse_event("error",{"message":str(e)})
+            except Exception as e:
+                logger.error(f"Stream error: {e}", exc_info=True)
+                user_message = "Something went wrong processing your request. Please try again."
+                yield sse_event("error",{"message":str(e)})
 
     return StreamingResponse(
         event_stream(),
@@ -280,71 +281,72 @@ async def resume(request: ResumeRequest):
     async def event_stream():
         handler = CallbackHandler()
         with langfuse.start_as_current_observation(as_type="span", name="chat-request") as span, \
-            propagate_attributes(session_id=request.session_id, user_id=request.session_id, tags=["chat"]):
+            propagate_attributes(session_id=request.session_id, user_id=request.session_id, tags=["resume"]):
             config = {"configurable": {"thread_id": request.session_id}, "callbacks": [handler]}
-        try:
-            async for event in chatbot.app.astream_events(
-                Command(resume=request.answer),
-                config,
-                version="v2",
-            ):
-                kind = event["event"]
-                name = event.get("name","")
-                trace_id = span.trace_id
-
-                if kind == "on_tool_start":
-                    yield sse_event("tool_start",{
-                        "tool":name,
-                        "input":event.get("data",{}).get("input",{}),
-                    })
-                
-                elif kind == "on_tool_end":
-                    output = format_tool_output(name, event.get("data",{}).get("output",""))
-                    input_args = event.get("data",{}).get("input",{})
-                    yield sse_event("tool_end",{
-                        "tool":name,
-                        "output":output,
-                        "input": input_args,
-                    })
-
-                elif kind == "on_chat_model_stream":
-                    chunk = event.get("data",{}).get("chunk")
-                    if chunk and hasattr(chunk,"content") and chunk.content:
-                        yield sse_event("token",{"content":chunk.content})
-
+            try:
+                async for event in chatbot.app.astream_events(
+                    Command(resume=request.answer),
+                    config,
+                    version="v2",
+                ):
+                    kind = event["event"]
+                    name = event.get("name","")
                     
-            state = await chatbot.app.aget_state(config)
 
-            # on graph interrupt (triage)
-            if state.next:
-                interrupt_data = state.tasks[0].interrupts[0].value
-                yield sse_event("interrupt",{
-                    "question": interrupt_data.get("question", "Could you please specify?"),
-                    "options": interrupt_data.get("options",[]),
+                    if kind == "on_tool_start":
+                        yield sse_event("tool_start",{
+                            "tool":name,
+                            "input":event.get("data",{}).get("input",{}),
+                        })
+                    
+                    elif kind == "on_tool_end":
+                        output = format_tool_output(name, event.get("data",{}).get("output",""))
+                        input_args = event.get("data",{}).get("input",{})
+                        yield sse_event("tool_end",{
+                            "tool":name,
+                            "output":output,
+                            "input": input_args,
+                        })
+
+                    elif kind == "on_chat_model_stream":
+                        chunk = event.get("data",{}).get("chunk")
+                        if chunk and hasattr(chunk,"content") and chunk.content:
+                            yield sse_event("token",{"content":chunk.content})
+
+                        
+                state = await chatbot.app.aget_state(config)
+
+                # on graph interrupt (triage)
+                if state.next:
+                    interrupt_data = state.tasks[0].interrupts[0].value
+                    yield sse_event("interrupt",{
+                        "question": interrupt_data.get("question", "Could you please specify?"),
+                        "options": interrupt_data.get("options",[]),
+                        "session_id": request.session_id,
+                    })
+                    return        # pause
+                
+                answer = state.values.get("draft_answer","")
+
+                citation_passed = state.values.get("citation_check_passed", False)
+                #real_papers = extract_real_papers_from_tool_results(state.values.get("messages", []))
+                #cited_in_text = set(ARXIV_ID_PATTERN.findall(answer))
+                #cited_ids = [pid for pid in cited_in_text if pid in real_papers] if citation_passed else []
+                fetched_papers = state.values.get("fetched_papers", [])
+                cited_ids = [pid["paper_id"] for pid in fetched_papers if isinstance(pid,dict) and "paper_id" in pid] if citation_passed else []
+
+                trace_id = span.trace_id
+                yield sse_event("done",{
+                    "answer": answer,
                     "session_id": request.session_id,
+                    "cited_paper_ids": cited_ids,
+                    "fetched_papers": fetched_papers,
+                    "trace_id": trace_id,
                 })
-                return        # pause
             
-            answer = state.values.get("draft_answer","")
-
-            citation_passed = state.values.get("citation_check_passed", False)
-            #real_papers = extract_real_papers_from_tool_results(state.values.get("messages", []))
-            #cited_in_text = set(ARXIV_ID_PATTERN.findall(answer))
-            #cited_ids = [pid for pid in cited_in_text if pid in real_papers] if citation_passed else []
-            fetched_papers = state.values.get("fetched_papers", [])
-            cited_ids = [pid["paper_id"] for pid in fetched_papers if isinstance(pid,dict) and "paper_id" in pid] if citation_passed else []
-            
-            yield sse_event("done",{
-                "answer": answer,
-                "session_id": request.session_id,
-                "cited_paper_ids": cited_ids,
-                "fetched_papers": fetched_papers,
-                "trace_id": trace_id,
-            })
-        
-        except Exception as e:
-            logger.error(f"Resume stream error: {e}",exc_info=True)
-            yield sse_event("error",{"message":str(e)})
+            except Exception as e:
+              logger.error(f"Resume stream error: {e}",exc_info=True)
+              yield sse_event("error",{"message":str(e)})
 
     return StreamingResponse(
         event_stream(),
