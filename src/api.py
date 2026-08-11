@@ -278,6 +278,10 @@ async def resume(request: ResumeRequest):
     config = {"configurable":{"thread_id":request.session_id}}
 
     async def event_stream():
+        handler = CallbackHandler()
+        with langfuse.start_as_current_observation(as_type="span", name="chat-request") as span, \
+            propagate_attributes(session_id=request.session_id, user_id=request.session_id, tags=["chat"]):
+            config = {"configurable": {"thread_id": request.session_id}, "callbacks": [handler]}
         try:
             async for event in chatbot.app.astream_events(
                 Command(resume=request.answer),
@@ -286,6 +290,7 @@ async def resume(request: ResumeRequest):
             ):
                 kind = event["event"]
                 name = event.get("name","")
+                trace_id = span.trace_id
 
                 if kind == "on_tool_start":
                     yield sse_event("tool_start",{
@@ -334,6 +339,7 @@ async def resume(request: ResumeRequest):
                 "session_id": request.session_id,
                 "cited_paper_ids": cited_ids,
                 "fetched_papers": fetched_papers,
+                "trace_id": trace_id,
             })
         
         except Exception as e:
