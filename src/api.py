@@ -22,7 +22,10 @@ from dotenv import load_dotenv,find_dotenv
 
 from contextlib import asynccontextmanager
 from citation_verifier import extract_real_papers_from_tool_results, ARXIV_ID_PATTERN,_strip_version
+from langfuse import get_client, propagate_attributes
+from langfuse.langchain import CallbackHandler
 
+langfuse = get_client()   
 load_dotenv(find_dotenv())
 
 from graph_pipeline import build_graph
@@ -178,6 +181,10 @@ async def chat(request: ChatRequest):
     config = {"configurable":{"thread_id": session_id}}   # CHECKPOINTER
 
     async def event_stream():
+        handler = CallbackHandler()
+        with  langfuse.start_as_current_observation(as_type="span",name="chat-request") as span, \
+            propagate_attributes(session_id=session_id,user_id=session_id,tags=["chat"]):
+           config = {"configurable":{"thread_id": session_id},"callbacks":[handler]}
         try:
             async for event in chatbot.app.astream_events(
                 {
@@ -191,6 +198,7 @@ async def chat(request: ChatRequest):
             ):
                 kind = event["event"]
                 name = event.get("name","")
+                trace_id = span.trace_id
 
                 if kind == "on_tool_start":
                     yield sse_event("tool_start",{
@@ -241,6 +249,7 @@ async def chat(request: ChatRequest):
                 "session_id": session_id,
                 "cited_paper_ids": cited_ids,
                 "fetched_papers": fetched_papers,
+                "trace_id": trace_id,
             })
         
         except Exception as e:
