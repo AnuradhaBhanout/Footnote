@@ -422,8 +422,8 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
             async def call_agent(recursion_limit):
                 agent = await chatbot.acquire_agent()
                 try:
-                    config={**config, "recursion_limit": recursion_limit}
-                    return await agent.ainvoke({"messages": messages}, config=config)
+                    merged_config={**config, "recursion_limit": recursion_limit}
+                    return await agent.ainvoke({"messages": messages}, config=merged_config)
                     # return await agent.ainvoke({"messages": messages}, config={"recursion_limit": recursion_limit})
                 finally:
                     await chatbot.release_agent()
