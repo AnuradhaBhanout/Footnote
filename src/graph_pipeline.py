@@ -53,6 +53,11 @@ ACTION_TOOL_NAMES = {"write_file","edit_file","create_directory","move_file","fe
 
 # """
 
+from langfuse import get_client, propagate_attributes
+from langfuse.langchain import CallbackHandler
+
+langfuse = get_client()   
+
 
 def _collect_paper_ids_from_search(messages: list) -> list[str]:
     """Pull every paper_id out of search_papers / hybrid_search_papers tool results,
@@ -138,7 +143,8 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
     #triage_llm = llm.with_structured_output(TriageAssessment,method="function_calling")
    # reformulate_llm = llm.with_structured_output(QueryReformulation,method="function_calling")
 
-    async def check_cache(state: GraphState)-> GraphState:
+    async def check_cache(state: GraphState,config: RunnableConfig)-> GraphState:
+        
         await chatbot.acquire_agent()
         try:
             cache_check_tool = next((t for t in chatbot.available_tools if t.name == "check_semantic_cache"), None)
@@ -148,10 +154,12 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                 return {**state, "cache_hit": False}
 
             
-            raw = await cache_check_tool.ainvoke({"query": state["original_query"]})
+            raw = await cache_check_tool.ainvoke({"query": state["original_query"]},config=config)
             result = _parse_tool_result(raw)
+            hit = bool(result.get("hit"))
+            get_client().score_current_trace(name="cache_hit", value=1 if hit else 0)
             logger.info(f"--- CACHE DEBUG: raw={repr(raw)[:300]}, parsed result={result} ---")
-            if result.get("hit"):
+            if hit:
                 return {**state, 
                          "cache_hit": True,
                          "draft_answer": result["answer"],
@@ -159,10 +167,12 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                          "citation_check_passed": True,
                          }
         except Exception as e:
+            get_client().score_current_trace(name="error", value=1 if e else 0)
             logger.error(f"Cache check failed:{type(e).__name__}: {e}")
 
         finally:
             await chatbot.release_agent()     
+       
         return {**state, "cache_hit": False}
     
 
@@ -412,7 +422,9 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
             async def call_agent(recursion_limit):
                 agent = await chatbot.acquire_agent()
                 try:
-                    return await agent.ainvoke({"messages": messages}, config={"recursion_limit": recursion_limit})
+                    config={**config, "recursion_limit": recursion_limit}
+                    return await agent.ainvoke({"messages": messages}, config=config)
+                    # return await agent.ainvoke({"messages": messages}, config={"recursion_limit": recursion_limit})
                 finally:
                     await chatbot.release_agent()
 
@@ -647,6 +659,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
     def check_citations(state: GraphState)-> GraphState:
         result = verify_citations(state["draft_answer"],state["messages"],overlap_threshold=0.3)
         logger.info(f"--- CITATION CHECK: passed={result['passed']} issues={result['issues']}")
+        get_client().score_current_trace(name="citation_pass_rate", value=1 if result["passed"] else 0, comment="; ".join(result["issues"]))
         return {**state,"citation_check_passed":result["passed"], "citation_issues":result["issues"]}
     
 
@@ -688,20 +701,21 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
         }
     
 
-    async def finalize(state: GraphState)-> GraphState:
+    async def finalize(state: GraphState,config: RunnableConfig)-> GraphState:
         if state.get("draft_answer") and state["retry_count"] == 0  and state.get("answer_is_reliable", False):
             await chatbot.acquire_agent()
             try:
                 cache_store_tool = next((t for t in chatbot.available_tools if t.name == "store_semantic_cache"), None)
         
                 if cache_store_tool is not None and state.get("draft_answer")and state["retry_count"] == 0:
-                    
+                        
                         await cache_store_tool.ainvoke(
                             {
                                 "query":state["original_query"],
                                 "answer":state["draft_answer"],
                                 "fetched_papers": state.get("fetched_papers", []),
-                            }
+                            },
+                            config=config
                         )
             except Exception as e:
                 logger.error(f"Cache store failed (non-fatal): {e}")
