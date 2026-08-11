@@ -22,11 +22,12 @@ from dotenv import load_dotenv,find_dotenv
 
 from contextlib import asynccontextmanager
 from citation_verifier import extract_real_papers_from_tool_results, ARXIV_ID_PATTERN,_strip_version
+ 
+load_dotenv(find_dotenv())
 from langfuse import get_client, propagate_attributes
 from langfuse.langchain import CallbackHandler
 
-langfuse = get_client()   
-load_dotenv(find_dotenv())
+langfuse = get_client()  
 
 from graph_pipeline import build_graph
 os.makedirs("logs", exist_ok=True)
