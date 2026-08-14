@@ -12,13 +12,29 @@ _ = load_dotenv(find_dotenv())
 DATABASE_URL = os.getenv("DATABASE_URL")
 _pool = psycopg2.pool.SimpleConnectionPool(1,10,DATABASE_URL,connect_timeout =10)
 
+# def get_conn():
+#     """Return a psycopg2 connection with pgvectortype registered."""
+#    # conn = psycopg2.connect(DATABASE_URL,connect_timeout = 10)
+
+#     conn = _pool.getconn()
+#     try:
+#        register_vector(conn)
+#     except psycopg2.ProgrammingError:
+#         conn.rollback()
+#     return conn
+
 def get_conn():
     """Return a psycopg2 connection with pgvectortype registered."""
-   # conn = psycopg2.connect(DATABASE_URL,connect_timeout = 10)
-
     conn = _pool.getconn()
     try:
-       register_vector(conn)
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1")
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        _pool.putconn(conn, close=True)
+        conn = _pool.getconn()
+
+    try:
+        register_vector(conn)
     except psycopg2.ProgrammingError:
         conn.rollback()
     return conn
@@ -90,7 +106,9 @@ def init_db():
                 );
             """)
 
-    conn.close()
+    #conn.close()
+    put_conn(conn)
+
     print("[db] Tables ready.")
 
 
