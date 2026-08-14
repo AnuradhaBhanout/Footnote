@@ -179,7 +179,7 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=503, detail="Service is not ready")
     
     session_id = request.session_id or str(uuid.uuid4())
-    config = {"configurable":{"thread_id": session_id}}   # CHECKPOINTER
+    #config = {"configurable":{"thread_id": session_id}}   # CHECKPOINTER
 
     async def event_stream():
         handler = CallbackHandler()
@@ -277,7 +277,7 @@ async def resume(request: ResumeRequest):
     if not chatbot:
         raise HTTPException(status_code=503,detail="Service not ready")
     
-    config = {"configurable":{"thread_id":request.session_id}}
+   # config = {"configurable":{"thread_id":request.session_id}}
 
     async def event_stream():
         handler = CallbackHandler()
