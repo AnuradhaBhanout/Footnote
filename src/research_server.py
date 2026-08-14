@@ -40,8 +40,8 @@ _index_loaded = False
 _semantic_cache = SemanticCache(model=_hybrid_index.model) # reuse the loaded model
 
 _evaluator_client =OpenAI(
-    base_url = "https://integrate.api.nvidia.com/v1",#"https://openrouter.ai/api/v1",
-    api_key= os.getenv("NVIDIA_API_KEY"),#os.getenv("OPENAI_API_KEY"),
+    base_url = "https://api.cerebras.ai/v1",                                  #"https://integrate.api.nvidia.com/v1",#"https://openrouter.ai/api/v1",
+    api_key= os.getenv("CEREBRAS_API_KEY"),                                   #os.getenv("NVIDIA_API_KEY"),#os.getenv("OPENAI_API_KEY"),
 )
 
 # _evaluator_client =OpenAI(
@@ -49,7 +49,7 @@ _evaluator_client =OpenAI(
 #     api_key=os.getenv("GROQ_API_KEY"),
 # )
 
-EVALUATOR_MODEL = "deepseek-ai/deepseek-v4-flash"  #"llama-3.3-70b-versatile"
+EVALUATOR_MODEL = "llama3.1-8b"                                                 #"deepseek-ai/deepseek-v4-flash"  #"llama-3.3-70b-versatile"
 
 def evaluate_relevance(query:str,results:list)->dict:
     """LLM-as-judge: is at least one retrieved paper actually relevant, or is this a bad batch?"""
