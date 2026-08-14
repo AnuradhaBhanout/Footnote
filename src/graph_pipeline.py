@@ -540,11 +540,15 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                         )
                         agent_messages = agent_messages + [extract_msg]
 
-                        final_pass = agent_messages + [HumanMessage(
+                        final_pass =[
+                            HumanMessage(content=state["current_query"]),
+                            extract_msg,
+                            HumanMessage(
                             content="Using ONLY the paper details returned above, write your final "
                                     "plain-language summary now. Do not call any tools."
-                        )]
+                        ),]
                         final_response = await chatbot.llm.ainvoke(final_pass,config= config)
+
                         agent_messages = agent_messages + [final_response]
                         extract_ran = True
                     except Exception as e:
