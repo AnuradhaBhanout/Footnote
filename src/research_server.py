@@ -187,7 +187,8 @@ async def search_papers(topic: str, max_results: int = 5) -> List[str]:
       papers = await asyncio.wait_for( asyncio.to_thread(lambda: list(client.results(search))), timeout=10.0)
     except asyncio.TimeoutError:
         logging.error(f"search_papers: arxiv timed out for topic '{topic}'")
-        return []
+        return {"paper_ids": [], "sufficient": False, "reason": "arXiv search timed out."}   # was: return []
+       # return []
     
     # Create directory for this topic
     path = os.path.join(PAPER_DIR, topic.lower().replace(" ", "_"))
@@ -238,7 +239,21 @@ async def search_papers(topic: str, max_results: int = 5) -> List[str]:
         print("Disk write skipped (read-only filesystem)", file=sys.stderr)
 
     await asyncio.to_thread(_insert_papers_sync, papers_info, topic)
-    return paper_ids
+    #return paper_ids
+    if not paper_ids:
+        return {"paper_ids": [], "sufficient": False, "reason": "arXiv returned no results."}
+
+    await asyncio.to_thread(_ensure_index_loaded)
+    texts = [f"{papers_info[pid]['title']}. {papers_info[pid]['summary']}" for pid in paper_ids]
+    query_vec = _hybrid_index.model.encode([topic], convert_to_numpy=True, normalize_embeddings=True)[0]
+    doc_vecs  = _hybrid_index.model.encode(texts, convert_to_numpy=True, normalize_embeddings=True)
+    sims = doc_vecs @ query_vec
+
+    RELEVANCE_FLOOR = 0.35
+    kept = [pid for pid, sim in zip(paper_ids, sims) if sim >= RELEVANCE_FLOOR]
+
+    return {"paper_ids": kept, "sufficient": len(kept) > 0,
+            "reason": f"{len(kept)}/{len(paper_ids)} arXiv results passed similarity floor {RELEVANCE_FLOOR}."}
 
 
 
