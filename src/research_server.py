@@ -160,7 +160,7 @@ async def hybrid_search_papers(query: str,top_k: int = 5,alpha: float = 0.5)-> d
 
 
 @mcp.tool()
-async def search_papers(topic: str, max_results: int = 5) -> List[str]:
+async def search_papers(topic: str, max_results: int = 5) -> dict:                        # List[str]:
     """
     Search for papers on arXiv based on a topic and store their information.
     
