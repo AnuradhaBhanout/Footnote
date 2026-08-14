@@ -69,7 +69,7 @@ def evaluate_relevance(query:str,results:list)->dict:
     response = _evaluator_client.chat.completions.create(
         model=EVALUATOR_MODEL,
         messages=[{"role":"user","content":prompt}],
-        max_tokens=150,
+        max_tokens=300,
     )
 
     try:
