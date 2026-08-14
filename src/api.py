@@ -333,7 +333,9 @@ async def resume(request: ResumeRequest):
                 #real_papers = extract_real_papers_from_tool_results(state.values.get("messages", []))
                 #cited_in_text = set(ARXIV_ID_PATTERN.findall(answer))
                 #cited_ids = [pid for pid in cited_in_text if pid in real_papers] if citation_passed else []
-                fetched_papers = state.values.get("fetched_papers", [])
+
+                answer_is_reliable = state.values.get("answer_is_reliable",False)
+                fetched_papers = state.values.get("fetched_papers", []) if answer_is_reliable else []
                 cited_ids = [pid["paper_id"] for pid in fetched_papers if isinstance(pid,dict) and "paper_id" in pid] if citation_passed else []
 
                 trace_id = span.trace_id
