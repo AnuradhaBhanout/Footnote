@@ -182,7 +182,7 @@ async def search_papers(topic: str, max_results: int = 5) -> List[str]:
 
     #papers = client.results(search)
     try:
-      papers = await asyncio.wait_for( asyncio.to_thread(lambda: list(client.results(search))), timeout=45.0)
+      papers = await asyncio.wait_for( asyncio.to_thread(lambda: list(client.results(search))), timeout=10.0)
     except asyncio.TimeoutError:
         logging.error(f"search_papers: arxiv timed out for topic '{topic}'")
         return []
