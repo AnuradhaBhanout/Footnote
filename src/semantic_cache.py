@@ -3,7 +3,7 @@ import os
 import hashlib
 import time 
 import numpy as np
-from db import get_conn
+from db import get_conn , put_conn
 import json
 
 
@@ -41,7 +41,8 @@ class SemanticCache:
                             FROM semantic_cache ORDER BY created_at ASC;
                             """)
                 rows = cur.fetchall()
-            conn.close()
+            #conn.close()
+            put_conn(conn)
 
             self.entries = [
                 {
@@ -81,7 +82,8 @@ class SemanticCache:
                         json.dumps(entry.get("fetched_papers", [])),
                     ),
                 )
-        conn.close()
+       # conn.close()
+        put_conn(conn)
 
 
     @staticmethod

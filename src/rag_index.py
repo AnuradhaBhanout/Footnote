@@ -7,7 +7,7 @@ from rank_bm25 import BM25Okapi
 from psycopg2.extras import execute_values
 from embedding_model import EmbeddingModel
 
-from db import get_conn 
+from db import get_conn ,put_conn
 
 
 PAPER_DIR = "papers"
@@ -52,7 +52,8 @@ def load_all_papers() -> dict:
                     "pdf_url": r[4],
                     "published": r[5],
                 }
-    conn.close()
+    #conn.close()
+    put_conn(conn)
     return papers
 
 
@@ -62,7 +63,8 @@ def get_papers_fingerprint() -> tuple[int, str]:
     with conn.cursor() as cur:
         cur.execute("SELECT COUNT(*), COALESCE(MAX(paper_id), '') FROM papers;")
         row = cur.fetchone()
-    conn.close()
+    #conn.close()
+    put_conn(conn)
     return row[0], row[1]
 
 
@@ -147,7 +149,8 @@ class HybridIndex:
                     rows,
                     template="(%s, %s, %s, %s::vector)",
                 )
-        conn.close()
+        #conn.close()
+        put_conn(conn)
 
 
     def load_cache_or_build(self):
@@ -159,7 +162,8 @@ class HybridIndex:
         with conn.cursor() as cur:
             cur.execute("SELECT paper_id,title,text_chunk,embedding FROM paper_embeddings;")
             rows = cur.fetchall()
-        conn.close()
+        #conn.close()
+        put_conn(conn)
 
         if not rows:
             #Nothing in DB yet - build from disk

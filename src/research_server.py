@@ -15,7 +15,11 @@ load_dotenv(find_dotenv())
 from rag_index import HybridIndex,load_all_papers
 from openai import OpenAI
 
-from db import init_db,get_conn
+from db import init_db,get_conn, put_conn
+
+# import time
+# _last_freshness_check = 0
+# FRESHNESS_TTL = 60
 
 init_db()               # creates tables on first run, safe to call every time
 
@@ -268,7 +272,7 @@ def _insert_papers_sync(papers_info: dict, topic: str):
                     ON CONFLICT (paper_id) DO NOTHING
                 """, (pid, topic, info['title'], json.dumps(info['authors']),
                     info['summary'], info['pdf_url'], info['published']))
-    conn.close()
+    put_conn(conn)
     
      #  rebuilt the index when new papers are saved(commented because it needs more space which does not cover under free render tier)
     #_ensure_index_loaded()
@@ -322,7 +326,7 @@ async def extract_info(paper_ids: List[str]) -> str:
                 (paper_ids,)
             )
             rows = cur.fetchall()
-        conn.close()
+        put_conn(conn)
         return rows
 
     rows = await asyncio.to_thread(_fetch)
@@ -385,7 +389,8 @@ async def get_available_folders() -> str:
         with conn.cursor() as cur:
             cur.execute("SELECT DISTINCT topic FROM papers ORDER BY topic;")
             topics = [r[0] for r in cur.fetchall()]
-        conn.close()
+        #put_conn(conn)
+        put_conn(conn)
         return topics
     
     topics = await asyncio.to_thread(_fetchfolder)
@@ -446,7 +451,8 @@ async def get_topic_papers(topic: str) -> str:
                 (topic.lower().replace(" ", "_"),)
             )
             rows = cur.fetchall()
-        conn.close()
+        #put_conn(conn)
+        put_conn(conn)
         return rows
     
     rows = await asyncio.to_thread(_fetchpapers)
@@ -530,7 +536,8 @@ async def health(request):
     try:
         conn = get_conn()
         conn.cursor().execute("SELECT 1")
-        conn.close()
+        #put_conn(conn)
+        put_conn(conn)
         db_ok = True
     except Exception:
         pass
