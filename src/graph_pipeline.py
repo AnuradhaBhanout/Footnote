@@ -75,16 +75,24 @@ def _collect_paper_ids_from_search(messages: list) -> list[str]:
         # except (json.JSONDecodeError, AttributeError):
         #     continue
         data = parse_mcp_content(msg.content)
-        if data is None:
-            continue
+        # if data is None:
+        #     continue
+        if not  isinstance(data, dict):
+           continue 
 
-        if isinstance(data, dict) and "results" in data:      # hybrid_search_papers
+        if "results" in data:      # hybrid_search_papers
             verdict = data.get("evaluator_verdict") or {}
             if verdict.get("sufficient") is not True:
                 continue
-            ids.extend(r["paper_id"] for r in data.get("results", []) if isinstance(r, dict) and "paper_id" in r)
-        elif isinstance(data, list):                            # search_papers: bare list of IDs
-            ids.extend(pid for pid in data if isinstance(pid, str))
+            #ids.extend(r["paper_id"] for r in data.get("results", []) if isinstance(r, dict) and "paper_id" in r)
+            ids.extend(r["paper_id"] for r in data["results"] if isinstance(r, dict) and "paper_id" in r)
+        # elif isinstance(data, list):                            # search_papers: bare list of IDs
+        #     ids.extend(pid for pid in data if isinstance(pid, str))
+
+        elif "paper_ids" in data:
+            if not data.get("sufficient"):
+                continue
+            ids.extend(pid for pid in data["paper_ids"] if isinstance(pid,str))
 
     seen, out = set(), []
     for pid in ids:
