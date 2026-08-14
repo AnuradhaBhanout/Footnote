@@ -542,7 +542,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
 
                         final_pass =[
                             HumanMessage(content=state["current_query"]),
-                            extract_msg,
+                            HumanMessage(content=f"Paper details:\n{json.dumps(result)}"),
                             HumanMessage(
                             content="Using ONLY the paper details returned above, write your final "
                                     "plain-language summary now. Do not call any tools."
