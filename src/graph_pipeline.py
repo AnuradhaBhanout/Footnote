@@ -451,6 +451,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                     "draft_answer": "I couldn't find anything matching that after several attempts — could you try a different phrasing or a known paper title?",
                     "retry_count": state["retry_count"] + 1,
                     "answer_is_reliable": False,
+                    "fetched_papers": [],
                 }
 
             except (anyio.ClosedResourceError, McpError):
