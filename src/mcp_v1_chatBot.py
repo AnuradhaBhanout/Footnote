@@ -82,7 +82,7 @@ class MCP_ChatBot:
             openai_api_key=os.getenv("CEREBRAS_API_KEY"),       #openai_key,
             max_tokens=2024,
             max_retries=1,
-            timeout=33,
+            timeout=10,
             model_kwargs={"parallel_tool_calls": False},
         )
 
