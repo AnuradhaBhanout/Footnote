@@ -42,6 +42,7 @@ _semantic_cache = SemanticCache(model=_hybrid_index.model) # reuse the loaded mo
 _evaluator_client =OpenAI(
     base_url = "https://api.cerebras.ai/v1",                                  #"https://integrate.api.nvidia.com/v1",#"https://openrouter.ai/api/v1",
     api_key= os.getenv("CEREBRAS_API_KEY"),                                   #os.getenv("NVIDIA_API_KEY"),#os.getenv("OPENAI_API_KEY"),
+    timeout=15.0,
 )
 
 # _evaluator_client =OpenAI(
