@@ -1,6 +1,8 @@
 
 import os
 import psycopg2
+import psycopg2.pool
+
 from pgvector.psycopg2 import register_vector
 from dotenv import load_dotenv,find_dotenv
 
@@ -8,15 +10,21 @@ from dotenv import load_dotenv,find_dotenv
 
 _ = load_dotenv(find_dotenv())
 DATABASE_URL = os.getenv("DATABASE_URL")
+_pool = psycopg2.pool.SimpleConnectionPool(1,10,DATABASE_URL,connect_timeout =10)
 
 def get_conn():
     """Return a psycopg2 connection with pgvectortype registered."""
-    conn = psycopg2.connect(DATABASE_URL,connect_timeout = 10)
+   # conn = psycopg2.connect(DATABASE_URL,connect_timeout = 10)
+
+    conn = _pool.getconn()
     try:
        register_vector(conn)
     except psycopg2.ProgrammingError:
         conn.rollback()
     return conn
+
+def put_conn(conn):
+    _pool.putconn(conn)
 
 
 def init_db():
