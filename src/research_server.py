@@ -70,6 +70,8 @@ def evaluate_relevance(query:str,results:list)->dict:
         model=EVALUATOR_MODEL,
         messages=[{"role":"user","content":prompt}],
         max_tokens=300,
+        reasoning_effort="low",
+        response_format={"type":"json_object"},
     )
 
     try:
