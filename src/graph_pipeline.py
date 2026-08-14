@@ -85,7 +85,9 @@ def _collect_paper_ids_from_search(messages: list) -> list[str]:
             if verdict.get("sufficient") is not True:
                 continue
             #ids.extend(r["paper_id"] for r in data.get("results", []) if isinstance(r, dict) and "paper_id" in r)
-            ids.extend(r["paper_id"] for r in data["results"] if isinstance(r, dict) and "paper_id" in r)
+            SCORE_FLOOR = 0.7
+            ids.extend(r["paper_id"] for r in data["results"] 
+                       if isinstance(r, dict) and "paper_id" in r and r.get("score",0) >= SCORE_FLOOR)
         # elif isinstance(data, list):                            # search_papers: bare list of IDs
         #     ids.extend(pid for pid in data if isinstance(pid, str))
 
