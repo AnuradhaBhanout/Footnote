@@ -167,7 +167,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                          "citation_check_passed": True,
                          }
         except Exception as e:
-            get_client().score_current_trace(name="error", value=1 if e else 0)
+            get_client().score_current_trace(name="error", value=1)       #if e else 0)
             logger.error(f"Cache check failed:{type(e).__name__}: {e}")
 
         finally:
