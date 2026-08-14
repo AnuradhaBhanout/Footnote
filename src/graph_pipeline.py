@@ -79,6 +79,9 @@ def _collect_paper_ids_from_search(messages: list) -> list[str]:
             continue
 
         if isinstance(data, dict) and "results" in data:      # hybrid_search_papers
+            verdict = data.get("evaluator_verdict") or {}
+            if verdict.get("sufficient") is not True:
+                continue
             ids.extend(r["paper_id"] for r in data.get("results", []) if isinstance(r, dict) and "paper_id" in r)
         elif isinstance(data, list):                            # search_papers: bare list of IDs
             ids.extend(pid for pid in data if isinstance(pid, str))
@@ -640,8 +643,10 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
             if data is not None:
                 
                 # Check for 'insufficient' verdict OR completely empty results list
-                verdict = data.get("evaluator_verdict", {})
+                verdict = data.get("evaluator_verdict", {}) if isinstance(data,dict) else {}
                 results = data.get("results", data.get("papers", [])) if isinstance(data, dict) else data
+                if len(results) == 0 or verdict.get("sufficient") is False:
+                    new_retry_count += 1
                 
                 is_bad = verdict.get("sufficient") is False or len(results) == 0
                 
