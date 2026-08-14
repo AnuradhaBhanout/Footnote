@@ -77,9 +77,9 @@ class MCP_ChatBot:
 
        
         self.llm = ChatOpenAI(
-            model="nvidia/nemotron-3-super-120b-a12b:free",   # Target a solid open-weights model
-            openai_api_base="https://openrouter.ai/api/v1", #"https://integrate.api.nvidia.com/v1",     # Connect directly to OpenRouter 
-            openai_api_key=openai_key,
+            model="llama-3.3-70b",                              #"nvidia/nemotron-3-super-120b-a12b:free",   # Target a solid open-weights model
+            openai_api_base="https://api.cerebras.ai/v1",       #"https://openrouter.ai/api/v1", #"https://integrate.api.nvidia.com/v1",     # Connect directly to OpenRouter 
+            openai_api_key=os.getenv("CEREBRAS_API_KEY"),       #openai_key,
             max_tokens=2024,
             max_retries=1,
             timeout=33,
