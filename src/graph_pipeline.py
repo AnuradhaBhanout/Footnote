@@ -656,9 +656,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                 # Check for 'insufficient' verdict OR completely empty results list
                 verdict = data.get("evaluator_verdict", {}) if isinstance(data,dict) else {}
                 results = data.get("results", data.get("papers", [])) if isinstance(data, dict) else data
-                if len(results) == 0 or verdict.get("sufficient") is False:
-                    new_retry_count += 1
-                
+
                 is_bad = verdict.get("sufficient") is False or len(results) == 0
                 
                 if is_bad and state["retry_count"] < MAX_RETRIES:
