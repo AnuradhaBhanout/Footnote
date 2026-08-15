@@ -16,6 +16,8 @@ from rag_index import HybridIndex,load_all_papers
 from openai import OpenAI
 
 from db import init_db,get_conn, put_conn
+import re
+from citation_verifier import _title_overlap_ration
 
 # import time
 # _last_freshness_check = 0
@@ -40,6 +42,12 @@ logging.basicConfig(
 
 _hybrid_index = HybridIndex()
 _index_loaded = False
+
+QUOTED_TITLE_PATTERN = re.compile(r'["\u201c]([^"\u201d]{4,})["\u201d]')
+
+def _quoted_phrase(query: str) -> str | None:
+    m = QUOTED_TITLE_PATTERN.search(query)
+    return m.group(1) if m else None
 
 _semantic_cache = SemanticCache(model=_hybrid_index.model) # reuse the loaded model
 
@@ -156,6 +164,18 @@ async def hybrid_search_papers(query: str,top_k: int = 5,alpha: float = 0.5)-> d
         logging.info(f"  {r['paper_id']} | combined={r['score']:.3f} | dense={r['dense_score']:.3f} | bm25={r['bm25_score']:.3f} | {r['title']}")
 
     judgment = evaluate_relevance(query,results)
+    ###ADDED##
+    quoted = _quoted_phrase(query)
+    if quoted and judgment.get("sufficient"):
+        best = next((r for r in results if r["paper_id"] == judgment.get("best_paper_id")), None)
+        title_match = _title_overlap_ration(quoted, best["title"]) if best else 0.0
+        if title_match < 0.7:
+            judgment = {
+                "sufficient": False,
+                "best_paper_id": None,
+                "reason": f"Query names a specific title (\"{quoted}\") not found among retrieved papers (best overlap={title_match:.2f}).",
+            }
+            ####
     logging.info(f"[evaluator] sufficient={judgment.get('sufficient')} reason={judgment.get('reason')}")
 
     return {"results": results,"evaluator_verdict": judgment}                                                                               
