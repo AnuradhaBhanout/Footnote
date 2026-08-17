@@ -49,53 +49,6 @@ _app_state: dict = {}    #holds llm,agent, graph_app, pg_conn, tools
 
 
 
-# @asynccontextmanager
-# async def lifespan(app: FastAPI):
-
-#     from mcp_v1_chatBot import MCP_ChatBot
-
-#     chatbot = MCP_ChatBot()
-#     await chatbot.connect_to_servers()      #connect to mcp server
-#     await chatbot._build_agent_and_graph()   #build agecnts + graph once at startup
-
-#     _app_state["chatbot"] = chatbot
-    
-#     # async def _keepalive():
-#     #     while True:
-#     #         await asyncio.sleep(30)
-#     #         try:
-#     #             session = next(iter(chatbot.sessions.values()), None)
-#     #             if session:
-#     #                 await session.send_ping()
-#     #         except Exception:
-#     #             pass
-#     #asyncio.create_task(_keepalive())
-#     task = asyncio.create_task(chatbot.session_manager())
-#     await chatbot.ready_event.wait()
-#     _app_state["chatbot"] = chatbot
-#     _app_state["session_task"] = task
-
-#     logger.info("API startup complete")
-
-#     try:
-#         yield  # server is now live and handles requests
-        
-#     finally:
-#         # no matter what if app runs normal or crashed i will shutdown the server.
-#         # chatbot = _app_state.get("chatbot")  
-#         # if chatbot:
-#         #     await chatbot.cleanup()
-
-#         # logger.info("API shutdown complete.")
-
-#         task = _app_state.get("session_task")
-#         if task:
-#             task.cancel()
-#             try:
-#                 await task
-#             except asyncio.CancelledError:
-#                 pass
-#         logger.info("API shutdown complete.")
 
 
 
@@ -330,9 +283,7 @@ async def resume(request: ResumeRequest):
                 answer = state.values.get("draft_answer","")
 
                 citation_passed = state.values.get("citation_check_passed", False)
-                #real_papers = extract_real_papers_from_tool_results(state.values.get("messages", []))
-                #cited_in_text = set(ARXIV_ID_PATTERN.findall(answer))
-                #cited_ids = [pid for pid in cited_in_text if pid in real_papers] if citation_passed else []
+
 
                 answer_is_reliable = state.values.get("answer_is_reliable",False)
                 fetched_papers = state.values.get("fetched_papers", []) if answer_is_reliable else []
@@ -360,10 +311,7 @@ async def resume(request: ResumeRequest):
         },
     )
 
-# @app.get("/health")
-# async def health():
-#     return {"status":"ok",
-#             "ready":"chatbot" in _app_state}
+
 
 @app.get("/health")
 async def health():

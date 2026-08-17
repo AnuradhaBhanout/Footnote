@@ -6,18 +6,18 @@ import json
 import os
 from typing import List
 from mcp.server.fastmcp import FastMCP
-from semantic_cache import SemanticCache
+from db.semantic_cache import SemanticCache
 import asyncio
 
 from dotenv import load_dotenv,find_dotenv
 load_dotenv(find_dotenv())
 
-from rag_index import HybridIndex,load_all_papers
+from db.rag_index import HybridIndex,load_all_papers
 from openai import OpenAI
 
-from db import init_db,get_conn, put_conn
+from db.db import init_db,get_conn, put_conn
 import re
-from citation_verifier import _title_overlap_ration
+from db.citation_verifier import _title_overlap_ration
 
 # import time
 # _last_freshness_check = 0

@@ -33,25 +33,7 @@ MAX_RETRIES = 2
 
 ACTION_TOOL_NAMES = {"write_file","edit_file","create_directory","move_file","fetch"}
 
-# #optimization
-# TRIAGE_SYSTEM_PROMPT = r"""
-# You are a triage assistant for a research helper tool used by everyday\people, not 
-# just technical experts. Your only job: decide if the user;s request is specific\
-# enough to act on right away, or if it's ambigious and needs a quick clarifying question
-# first.
 
-# A request is UNCLEAR if any of these are true:
-# - It uses a short term,name,or abbrivation that could plausibly mean more than one real thing.
-# - It refers to "the paper," "that one," "this," or similar without saying which one, when more
-# than one thing could be meant.
-# - It's too broad or vauge to search well(a single very general word covering many unrelated sub-topics).
-# - It's missing a detail that would clearly change the answer or action (e.g. asking to save something without saying what or where).
-
-# A request is CLEAR if it names a specific-enough topic or action that a reasonable a person could act on without guessing.
-
-# Write any carifiying question in plain, friendly language - do not assume the user knows technical jargon or this system's internal terms.
-
-# """
 
 from langfuse import get_client, propagate_attributes
 from langfuse.langchain import CallbackHandler
@@ -67,13 +49,7 @@ def _collect_paper_ids_from_search(messages: list) -> list[str]:
     for msg in messages:
         if not isinstance(msg, ToolMessage):
             continue
-        # try:
-        #     content = msg.content
-        #     if isinstance(content, list):
-        #         content = next((b["text"] for b in content if isinstance(b, dict) and b.get("type") == "text"), "")
-        #     data = json.loads(content)
-        # except (json.JSONDecodeError, AttributeError):
-        #     continue
+
         data = parse_mcp_content(msg.content)
         # if data is None:
         #     continue
@@ -88,8 +64,7 @@ def _collect_paper_ids_from_search(messages: list) -> list[str]:
             SCORE_FLOOR = 0.7
             ids.extend(r["paper_id"] for r in data["results"] 
                        if isinstance(r, dict) and "paper_id" in r and r.get("score",0) >= SCORE_FLOOR)
-        # elif isinstance(data, list):                            # search_papers: bare list of IDs
-        #     ids.extend(pid for pid in data if isinstance(pid, str))
+
 
         elif "paper_ids" in data:
             if not data.get("sufficient"):
@@ -152,9 +127,7 @@ async def _invoke_with_retry(llm, messages):
 
 
 def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
-#optimization    
-    #triage_llm = llm.with_structured_output(TriageAssessment,method="function_calling")
-   # reformulate_llm = llm.with_structured_output(QueryReformulation,method="function_calling")
+
 
     async def check_cache(state: GraphState,config: RunnableConfig)-> GraphState:
         
@@ -192,134 +165,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
     def after_cache(state: GraphState)-> str:
         return "end" if state["cache_hit"] else "triage_query"
     
-#     async def triage_query(state: GraphState) -> GraphState:
-#         logger.info("--- NODE START: triage_query ---")
-            
-#         messages = state.get("messages", [])
-#         if len(messages) >= 2:
-#             last = messages[-1]
-#             second_last = messages[-2]
-#             if isinstance(last, HumanMessage) and isinstance(second_last, AIMessage) and  last.content != state.get("original_query"):
-#                 # This is a resumed state — AI asked, human answered
-#                 logger.info("--- TRIAGE: Resuming, skipping LLM ---")
-#                 return {
-#                     **state,
-#                     "current_query": last.content,
-#                     "retry_count": 0,
-#                 }
-            
-#         if state.get("current_query"): #and state["current_query"] != state["original_query"]:
-#            logger.info("--- TRIAGE: Skipping to agent (already clarified) ---")
-#            return state
-        
-#         history = state.get("messages",[])
-#        # recent_context = history[-4:] if history else []
 
-#         updated_messages = list(state["messages"])+ [HumanMessage(content=state["original_query"])]
-
-#         trimmed_history = trim_messages(
-#             updated_messages,
-#             max_tokens=12,
-#             token_counter=len,
-#             strategy="last",
-#             include_system=False,
-#         )
-        
-#         assessment: TriageAssessment = await triage_llm.ainvoke([SystemMessage(content=TRIAGE_SYSTEM_PROMPT)] + trimmed_history)
-#         #     SystemMessage(content=TRIAGE_SYSTEM_PROMPT),
-#         #     HumanMessage(content=state["original_query"]),
-#         # ])
-#         if assessment is None:
-#             logger.warning("--- TRIAGE: LLM returned None, defaulting to clear ---")
-#             return {
-#                 **state,
-#                 "messages": updated_messages,
-#                 "current_query": state["original_query"],
-#                 "retry_count": 0
-#             }
-
-# # Implementing    HUMAN IN LOOP     ##################
-#         if not assessment.is_clear:
-#             logger.info(f"--- TRIAGE: Request unclear. Question: {assessment.clarifying_question}")
-#             ai_question = assessment.clarifying_question or "I'm not quite sure what you mean. Could you provide more details?"
-            
-#             human_answer = interrupt({
-#                 "question": ai_question,
-#                 "options": assessment.possible_interpretations or [],
-#             })
-#             logger.info(f"--- TRIAGE: Resumed with answer: {human_answer}")
-# ##### HUMAN - AI - HUMAN ### Conversation flow ###
-            
-#             updated_messages.append(AIMessage(content=ai_question))
-#             updated_messages.append(HumanMessage(content=human_answer))
-                
-
-
-#         #     # combined query so the agent has more context
-#         # if recent_context:
-#         #     combined_query = (
-#         #         f"Conversation so far includes a prior request about: "
-#         #         f"{recent_context[0].content if recent_context else ''}. "
-#         #         f"User now adds: {state['original_query']}"
-#         #     )
-
-
-#             return {
-#                 **state,
-#                 "messages": updated_messages,
-#                 "current_query":human_answer,
-#                 "retry_count":0}
-        
-#         logger.info("--- TRIAGE: Request is clear. Proceeding to Agent.")
-#         return{**state,
-#                "messages": updated_messages,
-#                "current_query": state["original_query"],
-#                "retry_count":0}
-    
-
-# #optimization
-#     async def assess_query(state: GraphState)-> GraphState:
-#         logger.info("---NODE START: assess_query---")
-
-#         updated_messages = list(state["messages"]) + [HumanMessage(content=state["original_query"])]
-
-#         trimmed = trim_messages(updated_messages,
-#                                 max_tokens=12,
-#                                 token_counter=len,
-#                                 strategy="last",
-#                                 include_system=False)
-        
-#         # assessment: TriageAssessment = await triage_llm.ainvoke(
-#         #     [SystemMessage(content=TRIAGE_SYSTEM_PROMPT)]+trimmed
-#         # )
-
-        
-#         assessment: TriageAssessment = await _invoke_with_retry(triage_llm,[SystemMessage(content=TRIAGE_SYSTEM_PROMPT)]+trimmed)
-
-#         if assessment is None:
-#             logger.warning("--- ASSESS: LLM returned None, defaulting to clear")
-#             return{
-#                 **state,
-#                 "messages":updated_messages,
-#                 "current_query":state["original_query"],
-#                 "clarification_question":None,
-#                 "clarification_options":[],
-#                 "retry_count":0
-#             }
-        
-#         if not assessment.is_clear:
-#             logger.info(f"--- ASSESS: Unclear. Question: {assessment.clarifying_question}")
-#             return {
-#                 **state,
-#                 "messages": updated_messages,
-#                 "clarification_question": assessment.clarifying_question or "Could you clarify?",
-#                 "clarification_options": assessment.possible_interpretations or [],
-#                 "retry_count": 0,
-#             }
-        
-#         logger.info("--- ASSESS: Clear. Proceeding to agent.")
-#         return {**state, "messages": updated_messages, "current_query": state["original_query"],
-#                 "clarification_question": None, "clarification_options": [], "retry_count": 0}
 
     
 
@@ -349,72 +195,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
             "retry_count": 0
             }
 
-# #optimization  
-#     async def after_assess(state: GraphState)-> GraphState:
-#          return "clarify" if state.get("clarification_question") else "run_agent"
 
-
-
-
-    # async def run_agent(state: GraphState)-> GraphState:
-    #     logger.info(f"--- NODE START: run_agent with query: {state['current_query']} ---")
-        
-    #     try:
-    #         messages = state["messages"]
-            
-    #         if not messages or messages[-1].content != state["current_query"]:
-    #             messages = messages+[HumanMessage(content=state["current_query"])]
-
-    #         # Trim before passing to agent — prevents context bloat causing loops
-    #         messages = trim_messages(
-    #             messages,
-    #             max_tokens=60,
-    #             token_counter=len,
-    #             strategy="last",
-    #             include_system=False,
-    #         )
-    #         agent = await chatbot.acquire_agent()
-    #         try:
-    #             agent_state = await agent.ainvoke({"messages":messages},config={"recursion_limit": 20})
-
-    #         except GraphRecursionError:
-    #             logger.error("run_agent: hit internal recursion limit — agent looped without converging")
-    #             return {
-    #                 **state,
-    #                 "draft_answer": "I couldn't find anything matching that after several attempts — could you try a different phrasing or a known paper title?",
-    #                 "retry_count": state["retry_count"] + 1,
-    #             }
-
-    #         except (anyio.ClosedResourceError,McpError):
-    #             for attempt in range(2):
-    #                 chatbot.reconnect_event.set()
-    #                 await chatbot.ready_event.wait()
-    #                 agent = await chatbot.acquire_agent()
-    #                 try:
-    #                     agent_state = await agent.ainvoke({"messages": messages}, config={"recursion_limit": 22})
-    #                     break
-    #                 except (anyio.ClosedResourceError,McpError)as e:
-    #                     if attempt == 1:
-    #                         logger.error(f"run_agent: reconnect retries exhausted: {e}")
-    #                         return {
-    #                             **state,
-    #                             "draft_answer": "The research service is temporarily unavailable — please try again in a moment.",
-    #                             "retry_count": state["retry_count"] + 1,
-    #                         }
-                        
-    #         except APIError as e:
-    #             if "tool call validation failed" in str(e) or "Failed to call a function" in str(e):
-    #                 logger.warning(f"Malformed tool call, retrying once: {e}")
-    #                 try:
-    #                     agent_state = await agent.ainvoke({"messages": messages}, config={"recursion_limit": 55})
-    #                 except Exception as e2:
-    #                     logger.error(f"run_agent: retry also failed: {e2}")
-    #                     return {**state, "draft_answer": "I had trouble processing that — could you try rephrasing?", "retry_count": state["retry_count"] + 1}
-    #             else:
-    #                 raise
-
-    #         finally:
-    #             await chatbot.release_agent()
     async def run_agent(state: GraphState ,config: RunnableConfig) -> GraphState:
         logger.info(f"--- NODE START: run_agent with query: {state['current_query']} ---")
         state = {**state, "fetched_papers": state.get("fetched_papers", [])}
@@ -505,17 +286,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
                         "answer_is_reliable": False}
 
             
-            # except httpx.ReadTimeout:
-            #     logger.warning("run_agent: NVIDIA stream stalled, retrying once")
-            #     try:
-            #         agent_state = await call_agent(25)
-            #     except Exception as e2:
-            #         logger.error(f"run_agent: retry after timeout also failed: {type(e2).__name__}: {e2}")
-            #         return {**state,
-            #                 "draft_answer": "The model took too long to respond — please try again.",
-            #                 "retry_count": state["retry_count"] + 1,
-            #                 "answer_is_reliable": False}
-
+           
                 
     #optimization ( check if the agent asked for clarification instead of searching )
             agent_messages = agent_state["messages"]
@@ -645,11 +416,7 @@ def build_graph(llm, chatbot):#, cache_check_tool, cache_store_tool):
         last_tool_msg = next((m for m in reversed(messages) if isinstance(m, ToolMessage)), None)
         
         if last_tool_msg:
-            # try:
-            #     content = last_tool_msg.content
-            #     if isinstance(content, list):
-            #         content = next((b["text"] for b in content if isinstance(b, dict) and b.get("type") == "text"), "")
-            #     data = json.loads(content)
+            
             data = parse_mcp_content(last_tool_msg.content)
             if data is not None:
                 

@@ -13,55 +13,6 @@ def _strip_version(paper_id: str) -> str:
     return re.sub(r"v\d+$", "", paper_id)
 
 
-# def extract_real_papers_from_tool_results(messages: list) -> dict:
-#     real_papers = {}
-
-#     # Step 1: from AIMessage tool_calls, map tool_call_id -> paper_id for extract_info calls
-#     extract_info_map = {}  # {tool_call_id: paper_id}
-#     for msg in messages:
-#         for tc in getattr(msg, "tool_calls", None) or []:
-#             if tc["name"] == "extract_info":
-#                 extract_info_map[tc["id"]] = tc["args"].get("paper_id", "")
-
-#     # Step 2: match ToolMessages back to paper_ids using tool_call_id, extract title from JSON
-#     for msg in messages:
-#         if not isinstance(msg, ToolMessage):
-#             continue
-#         paper_id = extract_info_map.get(msg.tool_call_id)
-#         if not paper_id:
-#             continue
-#         try:
-#             content = msg.content
-#             if isinstance(content, list):
-#                 content = next((b["text"] for b in content if isinstance(b,dict) and b.get("type") == "text"),"")
-                
-#             data = json.loads(content)
-#             title = data.get("title","")
-#             if title:
-#                # real_papers[paper_id] = title
-#                 real_papers[_strip_version(paper_id)] = title
-#         except (json.JSONDecodeError, AttributeError,StopIteration):
-#             pass
-
-#     # Step 3: also handle search_papers results which may include paper_id fields directly
-#     for msg in messages:
-#         if not isinstance(msg, ToolMessage):
-#             continue
-#         try:
-#             content = msg.content
-#             if isinstance(content, list):
-#                 content = next((b["text"] for b in content if isinstance(b,dict) and b.get("type") == "text"),"")
-#             data = json.loads(content)
-#             papers = data.get("results", data.get("papers", []))
-#             for p in papers:
-#                 if isinstance(p, dict) and "paper_id" in p and "title" in p:
-#                     #real_papers[p["paper_id"]] = p["title"]
-#                     real_papers[_strip_version(p["paper_id"])] = p["title"]
-#         except (json.JSONDecodeError, AttributeError,StopIteration):
-#             pass
-
-#     logger.info(f"--- CITATION VERIFIER: real_papers extracted = {list(real_papers.keys())}")
-#     return real_papers
 
 
 def extract_real_papers_from_tool_results(messages: list) -> dict:
@@ -73,12 +24,7 @@ def extract_real_papers_from_tool_results(messages: list) -> dict:
     for msg in messages:
         if not isinstance(msg, ToolMessage):
             continue
-        # try:
-        #     content = msg.content
-        #     if isinstance(content, list):
-        #         content = next((b["text"] for b in content if isinstance(b, dict) and b.get("type") == "text"), "")
-                
-        #     data = json.loads(content)
+
         if getattr(msg, "name", None) != "extract_info":
             continue
         data = parse_mcp_content(msg.content)
@@ -106,11 +52,7 @@ def extract_real_papers_from_tool_results(messages: list) -> dict:
         paper_id = extract_info_map.get(msg.tool_call_id)
         if not paper_id:
             continue
-        # try:
-        #     content = msg.content
-        #     if isinstance(content, list):
-        #         content = next((b["text"] for b in content if isinstance(b, dict) and b.get("type") == "text"), "")
-        #     data = json.loads(content)
+
         data = parse_mcp_content(msg.content)
         if isinstance(data, dict):
             title = data.get("title", "")
@@ -123,11 +65,7 @@ def extract_real_papers_from_tool_results(messages: list) -> dict:
     for msg in messages:
         if not isinstance(msg, ToolMessage):
             continue
-        # try:
-        #     content = msg.content
-        #     if isinstance(content, list):
-        #         content = next((b["text"] for b in content if isinstance(b, dict) and b.get("type") == "text"), "")
-        #     data = json.loads(content)
+
         data = parse_mcp_content(msg.content)
         if isinstance(data, dict):
             papers = data.get("results", data.get("papers", []))

@@ -11,26 +11,7 @@ from db.db import get_conn ,put_conn
 
 
 PAPER_DIR = "papers"
-#INDEX_CACHE = os.path.join(PAPER_DIR,"_rag_index.pk1")
 
-# def load_all_papers() -> dict:
-#     """Walk every topic folder under papers / and merge all papers_info.json files"""
-#     all_papers = {}
-#     if not os.path.exists(PAPER_DIR):
-#        return all_papers
- 
-#     for topic_dir in os.listdir(PAPER_DIR):
-#         file_path = os.path.join(PAPER_DIR,topic_dir,"papers_info.json")
-#         if os.path.isfile(file_path):
-#             with open(file_path,"r") as f:
-#                 try:
-#                     topic_papers = json.load(f)
-#                 except json.JSONDecodeError:
-#                     continue
-
-#             all_papers.update(topic_papers)
-
-#     return all_papers
 
 def load_all_papers() -> dict:
     conn = get_conn()
@@ -177,27 +158,8 @@ class HybridIndex:
         self.embeddings = np.array([r[3] for r in rows],dtype = np.float32)
         self.bm25 = BM25Okapi( [simple_tokenize(t) for t in self.texts])
 
-    # # Cache to disk 
-    # def _save_cache(self):
-    #     with open(INDEX_CACHE,"wb") as f:
-    #         pickle.dump(
-    #             {
-    #                 "paper_ids":self.paper_ids,"texts":self.texts,"embeddings":self.embeddings},f,
-                
-    #         )
 
-    # def load_cache_or_build(self):
-    #     if os.path.isfile(INDEX_CACHE):
-    #         with open(INDEX_CACHE,"rb") as f:
-    #             data = pickle.load(f)
-    #         self.paper_ids = data["paper_ids"]
-    #         self.texts = data["texts"]
-    #         self.embeddings = data["embeddings"]
-    #         tokenized_corpus = [simple_tokenize(t) for t in self.texts]
-    #         self.bm25 = BM25Okapi(tokenized_corpus) if self.texts else BM25Okapi([[""]])
-
-    #     else:
-    #         self.build()
+ 
 
     def refresh_if_stale(self):
         """
@@ -207,9 +169,7 @@ class HybridIndex:
         if fingerprint != self._last_fingerprint:
             self.build()
             self._last_fingerprint = fingerprint
-        # current_papers = load_all_papers()
-        # if set(current_papers.keys()) != set(self.paper_ids):
-        #     self.build()
+
 
 
 

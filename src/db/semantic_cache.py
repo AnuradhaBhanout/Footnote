@@ -19,17 +19,6 @@ class SemanticCache:
         self._load()
 
 
-    # def _load(self):                               //for local calls
-    #     if os.path.isfile(self.cache_file):
-    #         with open(self.cache_file,"rb") as f:
-    #            # 'pickle' converts the python list into a file
-    #            self.entries = pickle.load(f)
-    
-    # def _save(self):                              //for local calls
-    #     with open(self.cache_file,"wb") as f:
-    #         pickle.dump(self.entries,f)
-
-
 
     def _load(self):
         """ Load all cache entries from Postgres into memory at startup."""
