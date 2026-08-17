@@ -23,7 +23,7 @@ import psycopg
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 # from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.types import Command
-from graph_pipeline import build_graph
+from graph.graph_pipeline import build_graph
 #from langchain_ollama import ChatOllama
 import uuid
 import logging
@@ -266,45 +266,7 @@ class MCP_ChatBot:
      
 
     async def _rebuild_agent(self):
-        # tool_names_str =  ", ".join([t.name for t in self.available_tools])
-
-        # self.agent = create_agent(
-        #     model = self.llm,
-        #     tools=self.available_tools + [ask_clarification],
-
-        #     system_prompt=(
-        #     f"SYSTEM ROLE: You are an expert Research Assistant with access to these specific tools: [{tool_names_str}, ask_clarification].\n\n"
-
-        #     "CRITICAL TOOL RULES:\n"
-        #     "0. FIRST, judge if the request is clear enough to act on. If it uses a short/ambiguous "
-        #     "term, refers to 'that paper' or similar without specifying which, or is missing a needed "
-        #     "detail — call ask_clarification with a plain-language question and 2-4 short options. "
-        #     "Do NOT call any other tool in the same turn if you call ask_clarification.\n"
-        #     "0.5. When calling search_papers or hybrid_search_papers, extract the core topic/title as a "
-        #     "clean search phrase — strip filler like 'stands for', 'is about', 'called'. E.g. if the user "
-        #     "says 'POPE stands for Privileged On-Policy Exploration', search for 'Privileged On-Policy "
-        #     "Exploration', not the full sentence.\n"
-        #     "1. NEVER invent a tool name. Use ONLY the names listed above.\n"
-        #     "2. For paper info use ONLY: hybrid_search_papers, search_papers, extract_info.\n"
-        #     #"3. After calling search_papers, you MUST call extract_info for EACH paper_id returned.\n"
-        #     "3. After calling search_papers, you MUST call extract_info ONCE with the list of ALL paper_ids returned.\n"
-        #     "4. Only after extract_info calls are complete, write your final summary.\n"
-        #     "5. NEVER summarize a paper without first calling extract_info on its paper_id.\n"
-        #     "6. When you use a tool, you MUST wait for the tool output before claiming you have finished the task.\n"
-        #     "7. If a tool result for 'hybrid_search_papers' has 'evaluator_verdict.sufficient: false', "
-        #     "try 'search_papers' ONCE with different terms. If that also returns no useful results, "
-        #     "STOP searching and tell the user you couldn't find matching papers — do NOT retry more than once.\n\n"
-
-        #     "CITATION & INTEGRITY RULES:\n"
-        #     "- You must use the EXACT title and authors as returned by the tools.\n"
-        #     "- NEVER alter, paraphrase, or invent a paper title or finding.\n"
-        #     "- If a paper is not relevant to the query, EXCLUDE it entirely.\n\n"
-
-        #     "OUTPUT FORMAT:\n"
-        #     "After all tool calls are complete, provide a friendly, plain-language summary. "
-        #     "Provide ONLY the final answer. Do NOT include reasoning or internal thoughts."
-        #     )                       
-        # )
+       
         EXCLUDED_FROM_AGENT = {"extract_info", "check_semantic_cache", "store_semantic_cache"}
         search_tools = [t for t in self.available_tools if t.name not in EXCLUDED_FROM_AGENT]
         tool_names_str = ", ".join([t.name for t in search_tools])
@@ -350,12 +312,11 @@ class MCP_ChatBot:
 
     async def _build_agent_and_graph(self):
         await self._rebuild_agent()
-        #cache_check = next((t for t in self.available_tools if t.name == "check_semantic_cache"),None)
-        #cache_store = next((t for t in self.available_tools if t.name == "store_semantic_cache"),None)
+
 
         graph = build_graph(self.llm,self)#,cache_check,cache_store)
 
-        #self._pg_conn = await psycopg.AsyncConnection.connect(DATABASE_URL,autocommit=True)
+      
         self._pg_pool = AsyncConnectionPool(
             DATABASE_URL,
             min_size=1,
@@ -469,40 +430,7 @@ class MCP_ChatBot:
 
     async def process_query(self, query:str):
         logger.info(f"--- START PROCESS_QUERY: {query} ---")
-        #create_agent automates parallel calls, self-corrects minor tool exceptions, 
-        # and applies protec tion frameworks against runaway infinite routing loops.
-        # tool_names_str =  ", ".join([t.name for t in self.available_tools])
-        
-        # agent = create_agent(
-        #     model = self.llm,
-        #     tools=self.available_tools,
-        #     system_prompt=(
-        #     f"SYSTEM ROLE: You are an expert Research Assistant with access to these specific tools: [{tool_names_str}].\n\n"
-            
-        #     "CRITICAL TOOL RULES:\n"
-        #     "1. NEVER invent a tool name. Use ONLY the names listed above.\n"
-        #     "2. When you use a tool, you MUST wait for the tool output before claiming you have finished the task.\n"
-        #     "3. If a tool result for 'hybrid_search_papers' has 'evaluator_verdict.sufficient: false', "
-        #     "do NOT provide an answer. Instead, try 'search_papers' or 'fetch' to find better information.\n\n"
-
-        #     "CITATION & INTEGRITY RULES:\n"
-        #     "- You must use the EXACT title and authors as returned by the tools.\n"
-        #     "- NEVER alter, paraphrase, or invent a paper title or finding.\n"
-        #     "- If a paper is not relevant to the query, EXCLUDE it entirely.\n\n"
-
-        #     "OUTPUT FORMAT:\n"
-        #     "After all tool calls are complete, provide a friendly, plain-language summary of your findings. "
-        #     "If citations are used, list them clearly."
-        #     )                       
-        # )
-        
-        # cache_check = next(t for t in self.available_tools if t.name == "check_semantic_cache")
-        # cache_store = next(t for t in self.available_tools if t.name == "store_semantic_cache")
-
-        # graph = build_graph(self.llm,agent,cache_check,cache_store)
-
-        # async with AsyncSqliteSaver.from_conn_string("conversations.db") as checkpointer:
-        #     app = graph.compile(checkpointer= checkpointer)
+ 
         config = {"configurable":
                 {
                     "thread_id": self.thread_id
@@ -559,29 +487,12 @@ class MCP_ChatBot:
 
             
 
- #########   this part is now calling vai run_agent node in graph_pipeline.py   #################
-
-        # # messages = [{'role':'user','content':'query'}]
-        # # replaced with LANGCHAIN
-        # self.messages.append(HumanMessage(content=query))
 
         t0 = time.time()
-        # # replaced with LANGCHAIN
-        # # llm_with_tools = self.llm.bind_tools(self.available_tools)
-        # # response = await llm_with_tools.ainvoke(self.messages)
-        # agent_state = await agent.ainvoke({"messages": self.messages})
+
         print(f"[timing] agent response took {time.time() - t0:.2f}s")
 
-        # self.messages = agent_state["messages"]
-
-        # # self.messages.append(response)
-
-        # # if response.content:
-        # #     print(f"AI: {response.content}")
-
-        # final_response = self.messages[-1]
-        # if final_response.content:
-        #     print(f"AI: {final_response.content}")
+    
 
             
 
