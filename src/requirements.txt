@@ -329,10 +329,6 @@ python-multipart==0.0.32
     # via
     #   fastmcp-slim
     #   mcp
-pywin32==312
-    # via mcp
-pywin32-ctypes==0.2.3
-    # via keyring
 pyyaml==6.0.3
     # via
     #   fastmcp-slim
@@ -449,8 +445,6 @@ websockets==15.0.1
     #   fastmcp-slim
     #   langgraph-sdk
     #   langsmith
-win32-setctime==1.2.0
-    # via loguru
 wrapt==2.3.0
     # via langfuse
 xxhash==3.8.0
