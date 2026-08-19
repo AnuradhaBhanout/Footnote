@@ -170,7 +170,7 @@ async def search_papers(topic: str, max_results: int = 5) -> dict:              
 
 
 
-    paper_rel = [{"paper_id": pid,"title": paper_info[pid]["title"]} for pid in paper_ids]
+    paper_rel = [{"paper_id": pid,"title": papers_info[pid]["title"]} for pid in paper_ids]
     judgment = await asyncio.to_thread(evaluate_relevance, topic, paper_rel)
 
     best_id = judgment.get("best_paper_id")
