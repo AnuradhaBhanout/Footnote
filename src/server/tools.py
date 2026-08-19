@@ -60,7 +60,7 @@ async def hybrid_search_papers(query: str,top_k: int = 5,alpha: float = 0.5)-> d
         # print(f"  {r['paper_id']} | combined={r['score']:.3f} | dense={r['dense_score']:.3f} | bm25={r['bm25_score']:.3f} | {r['title']}",file=sys.stderr)
         logging.info(f"  {r['paper_id']} | combined={r['score']:.3f} | dense={r['dense_score']:.3f} | bm25={r['bm25_score']:.3f} | {r['title']}")
 
-    judgment = evaluate_relevance(query,results)
+    judgment = await asyncio.to_thread(evaluate_relevance,query,results)
     ###ADDED##
     quoted = _quoted_phrase(query)
     if quoted and judgment.get("sufficient"):
