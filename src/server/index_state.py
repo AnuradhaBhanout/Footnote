@@ -1,7 +1,7 @@
 
 
 
-from db.rag_index import HybridIndex,load_all_papers
+from db.rag_index import HybridIndex
 from db.semantic_cache import SemanticCache
 
 _hybrid_index = HybridIndex()
