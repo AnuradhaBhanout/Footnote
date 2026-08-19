@@ -208,7 +208,8 @@ class GraphNodes:
                     "draft_answer": "I ran into an unexpected issue processing that — please try again.",
                     "retry_count": state["retry_count"] + 1,
                     "answer_is_reliable": False}
-
+        
+        return agent_state,None
 
 
 
@@ -362,14 +363,14 @@ class GraphNodes:
 
 
 
-    def check_citations(state: GraphState)-> GraphState:
+    def check_citations(self,state: GraphState)-> GraphState:
         result = verify_citations(state["draft_answer"],state["messages"],overlap_threshold=0.3)
         logger.info(f"--- CITATION CHECK: passed={result['passed']} issues={result['issues']}")
         get_client().score_current_trace(name="citation_pass_rate", value=1 if result["passed"] else 0, comment="; ".join(result["issues"]))
         return {**state,"citation_check_passed":result["passed"], "citation_issues":result["issues"]}
 
 
-    async def retry_with_feedback(state: GraphState) -> GraphState:
+    async def retry_with_feedback(self,state: GraphState) -> GraphState:
         issues_text = "; ".join(state["citation_issues"])
         corrective_query = (
             f"{state['current_query']}\n\n"
@@ -380,7 +381,7 @@ class GraphNodes:
         return {**state,"current_query": corrective_query,"retry_count": state["retry_count"]+1}
     
 
-    def fallback(state: GraphState)->GraphState:
+    def fallback(self,state: GraphState)->GraphState:
         return{
             **state,
             "draft_answer": "I don't have enough verified information to answer that accurately"
