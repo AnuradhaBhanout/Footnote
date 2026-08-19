@@ -130,6 +130,7 @@ class GraphNodes:
                 strategy="last",
                 include_system=False,
             )
+            return messages
 
     async def _invoke_agent_with_recovery(self, messages: list, state: GraphState, config: RunnableConfig):
         """Runs the agent and handles every failure mode it's known to
