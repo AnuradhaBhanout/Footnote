@@ -151,7 +151,7 @@ class GraphNodes:
 
         except GraphRecursionError:
             logger.error("run_agent: hit internal recursion limit — agent looped without converging")
-            return {
+            return None,{
                 **state,
                 "draft_answer": "I couldn't find anything matching that after several attempts — could you try a different phrasing or a known paper title?",
                 "retry_count": state["retry_count"] + 1,
@@ -169,7 +169,7 @@ class GraphNodes:
                 except (anyio.ClosedResourceError, McpError) as e:
                     if attempt == 1:
                         logger.error(f"run_agent: reconnect retries exhausted: {e}")
-                        return {
+                        return None,{
                             **state,
                             "draft_answer": "The research service is temporarily unavailable — please try again in a moment.",
                             "retry_count": state["retry_count"] + 1,
@@ -181,7 +181,7 @@ class GraphNodes:
                 agent_state = await call_agent(10)  #25
             except Exception as e2:
                 logger.error(f"run_agent: retry after timeout also failed: {type(e2).__name__}: {e2}")
-                return {**state,
+                return None,{**state,
                         "draft_answer": "The model took too long to respond — please try again.",
                         "retry_count": state["retry_count"] + 1,
                         "answer_is_reliable": False}
@@ -193,7 +193,7 @@ class GraphNodes:
                     agent_state = await call_agent(15)  #55
                 except Exception as e2:
                     logger.error(f"run_agent: retry also failed: {type(e2).__name__}: {e2}")
-                    return {**state,
+                    return None,{**state,
                             "draft_answer": "I had trouble processing that — could you try rephrasing?", 
                             "retry_count": state["retry_count"] + 1,
                             "answer_is_reliable": False}
@@ -204,7 +204,7 @@ class GraphNodes:
             # catch-all: anything not matched above skipped straight to
             # agent_state["messages"] and crashed with UnboundLocalError
             logger.error(f"run_agent: unhandled exception from call_agent: {type(e).__name__}: {e}", exc_info=True)
-            return {**state,
+            return None,{**state,
                     "draft_answer": "I ran into an unexpected issue processing that — please try again.",
                     "retry_count": state["retry_count"] + 1,
                     "answer_is_reliable": False}
