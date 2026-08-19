@@ -163,22 +163,23 @@ async def search_papers(topic: str, max_results: int = 5) -> dict:              
     # If it detects changes, it automatically regenerates the vector embeddings and updates the BM25 dictionary on-the-fly.
     #_hybrid_index.refresh_if_stale()
     await asyncio.to_thread(_hybrid_index.refresh_if_stale)
-    
+
     #return paper_ids
     if not paper_ids:
         return {"paper_ids": [], "sufficient": False, "reason": "arXiv returned no results."}
 
-    await asyncio.to_thread(_ensure_index_loaded)
-    texts = [f"{papers_info[pid]['title']}. {papers_info[pid]['summary']}" for pid in paper_ids]
-    query_vec = _hybrid_index.model.encode([topic], convert_to_numpy=True, normalize_embeddings=True)[0]
-    doc_vecs  = _hybrid_index.model.encode(texts, convert_to_numpy=True, normalize_embeddings=True)
-    sims = doc_vecs @ query_vec
 
-    RELEVANCE_FLOOR = 0.35
-    kept = [pid for pid, sim in zip(paper_ids, sims) if sim >= RELEVANCE_FLOOR]
 
-    return {"paper_ids": kept, "sufficient": len(kept) > 0,
-            "reason": f"{len(kept)}/{len(paper_ids)} arXiv results passed similarity floor {RELEVANCE_FLOOR}."}
+    paper_rel = [{"paper_id": pid,"title": paper_info[pid]["title"]} for pid in paper_ids]
+    judgment = await asyncio.to_thread(evaluate_relevance, topic, paper_rel)
+
+    best_id = judgment.get("best_paper_id")
+    kept = [best_id] if judgment.get("sufficient") and best_id in paper_ids else []
+
+    return {
+        "paper_ids": kept, "sufficient":bool(kept),
+        "reason": judgment.get("reason","")
+    }
 
 
 
