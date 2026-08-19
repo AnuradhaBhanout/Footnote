@@ -46,10 +46,7 @@ async def hybrid_search_papers(query: str,top_k: int = 5,alpha: float = 0.5)-> d
     #_ensure_index_loaded()
     await asyncio.to_thread(_ensure_index_loaded)
 
-    # Checks if new papers have been downloaded to your disk directory (via the standard search_papers tool) since the search index was last built. 
-    # If it detects changes, it automatically regenerates the vector embeddings and updates the BM25 dictionary on-the-fly.
-    #_hybrid_index.refresh_if_stale()
-    await asyncio.to_thread(_hybrid_index.refresh_if_stale)
+
 
     # Executes the underlying hybrid search 
     results = _hybrid_index.search(query,top_k=top_k,alpha=alpha)
@@ -161,6 +158,12 @@ async def search_papers(topic: str, max_results: int = 5) -> dict:              
         print("Disk write skipped (read-only filesystem)", file=sys.stderr)
 
     await asyncio.to_thread(_insert_papers_sync, papers_info, topic)
+
+    # Checks if new papers have been downloaded to your disk directory (via the standard search_papers tool) since the search index was last built. 
+    # If it detects changes, it automatically regenerates the vector embeddings and updates the BM25 dictionary on-the-fly.
+    #_hybrid_index.refresh_if_stale()
+    await asyncio.to_thread(_hybrid_index.refresh_if_stale)
+    
     #return paper_ids
     if not paper_ids:
         return {"paper_ids": [], "sufficient": False, "reason": "arXiv returned no results."}
