@@ -7,7 +7,7 @@ from langfuse import get_client, propagate_attributes
 from langfuse.langchain import CallbackHandler
 
 logger = logging.getLogger("RAG-API")
-langfuse = get_client
+langfuse = get_client()
 
 TRUNCATE_EXEMPT_TOOLS = ("hybrid_search_papers","search_papers","extract_info")
 
