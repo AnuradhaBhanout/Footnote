@@ -12,7 +12,7 @@ import arxiv
 
 from db.citation_verifier import _title_overlap_ration
 from db.db import init_db,get_conn, put_conn
-from db.rag_index import load_all_papers
+from db.paper_store import load_all_papers
 from db.semantic_cache import SemanticCache
 
 from server.index_state import _hybrid_index,_semantic_cache,_ensure_index_loaded

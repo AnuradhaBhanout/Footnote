@@ -3,7 +3,7 @@ import json
 #import pickle
 import numpy as np
 from rank_bm25 import BM25Okapi
-#from sentence_transformers import SentenceTransformer
+from db.paper_store import load_all_papers,get_papers_fingerprint
 from psycopg2.extras import execute_values
 from db.embedding_model import EmbeddingModel
 
