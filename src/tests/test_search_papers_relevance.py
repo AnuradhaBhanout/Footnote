@@ -16,7 +16,7 @@ def _patch_arxiv_results(monkeypatch,papers):
         def results(self,search):
             return list(papers)
 
-    monkeypatch.setattr(tools.arxiv,"Client",lambda:FakeClient)
+    monkeypatch.setattr(tools.arxiv,"Client",lambda:FakeClient())
     monkeypatch.setattr(tools.arxiv,"Search",lambda **kw:object)
 
 
@@ -79,7 +79,7 @@ async def test_arxiv_results_before_evaluator(monkeypatch):
         called["n"] += 1
         return {"sufficient":False,"best_paper_id":None,"reason":"n/a"}
 
-    monkeypatch.setattr(tools,"evaluate_relvance",fake_evaluate)
+    monkeypatch.setattr(tools,"evaluate_relevance",fake_evaluate)
 
     result = await tools.search_papers("nonexistent topic xyz")
 
