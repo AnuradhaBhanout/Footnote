@@ -119,15 +119,9 @@ async def test_title_accept_high_overlap_match(monkeypatch):
 @pytest.mark.xfail(
         strict=True,
         reason=(
-            "OPEN BUG: hybrid_search_papers calls evaluate_relevance(query, results)"
-            "directly at server/tools.py"
+            "OPEN BUG: hybrid_search_papers calls evaluate_relevance(query, results) directly at server/tools.py"
         ),
 )
-
-
-
-
-
 
 
 
