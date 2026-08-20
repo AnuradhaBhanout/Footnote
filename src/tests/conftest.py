@@ -9,7 +9,7 @@ import pytest
 os.environ.setdefault("CEREBRAS_API_KEY","test-key")
 
 def _install_fake_module(name: str,**attrs)-> types.ModuleType:
-    if name is sys.modules:
+    if name in sys.modules:
         return sys.modules[name]
 
     mod  = types.ModuleType(name)
