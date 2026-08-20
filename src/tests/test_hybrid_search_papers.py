@@ -6,7 +6,7 @@ import pytest
 import server.tools as tools
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def _isolate_hybrid_search(monkeypatch):
     monkeypatch.setattr(tools,"_ensure_index_loaded",lambda:None)
     monkeypatch.setattr(tools,"load_all_papers",lambda:{})
@@ -112,17 +112,6 @@ async def test_title_accept_high_overlap_match(monkeypatch):
 
     assert out["evaluator_verdict"]["sufficient"] is True
     assert out["evaluator_verdict"]["best_paper_id"]  == "2601.18779v1"
-
-
-
-
-@pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "OPEN BUG: hybrid_search_papers calls evaluate_relevance(query, results) directly at server/tools.py"
-        ),
-)
-
 
 
 
