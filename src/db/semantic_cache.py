@@ -14,42 +14,7 @@ class SemanticCache:
     #def __init__(self,model,cache_file: str = os.path.join("papers","_semantic_cache.pk1")):  // for local calls
     def __init__(self,model):
         self.model = model
-       # self.cache_file = cache_file
-        #self.entries: list = []  # this will hold cached answers in memory
-        #self._load()
-
-
-
-    # def _load(self):
-    #     """ Load all cache entries from Postgres into memory at startup."""
-    #     try:
-    #         conn = get_conn()
-    #         with conn.cursor() as cur:
-    #             cur.execute("""
-    #                         SELECT query, answer, embedding, corpus_version, fetched_papers, created_at
-    #                         FROM semantic_cache ORDER BY created_at ASC;
-    #                         """)
-    #             rows = cur.fetchall()
-    #         #conn.close()
-    #         put_conn(conn)
-
-    #         self.entries = [
-    #             {
-    #                 "query":  r[0],
-    #                 "answer": r[1],
-    #                 "embedding": np.array(r[2],dtype = np.float32),
-    #                 "corpus_version": r[3],
-    #                 "fetched_papers": r[4] if r[4] is not None else [],
-    #                 "created_at": r[5].timestamp() if r[5] else time.time(),
-    #             }
-    #             for r in rows
-    #         ]
-        
-    #     except Exception as e:
-    #         #Dont crash on startup if db is not ready yet.
-    #         print(f"[semantic_cache] Warning: could not load from DB: {e}") 
-    #         self.entries = []
-
+       
 
     def _save(self,entry: dict):
         """ Insert one new cache entry into Postgres."""
