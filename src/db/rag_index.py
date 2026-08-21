@@ -33,6 +33,7 @@ class HybridIndex:
         self.model = EmbeddingModel(model_name=model_name)
         self.paper_ids = []
         self.texts = []
+        self.titles = []
         self.embeddings = None
         self.bm25 = None
         self._last_fingerprint = None
@@ -43,6 +44,7 @@ class HybridIndex:
         papers = load_all_papers()
         self.paper_ids = list(papers.keys())
         self.texts = [paper_to_text(papers[pid]) for pid in self.paper_ids]
+        self.titles = [papers[pid].get("title","Unknown")  for pid in self.paper_ids]
 
         #If no papers have been downloaded yet (or the database is empty),   
         if not self.texts:
@@ -120,6 +122,7 @@ class HybridIndex:
         
         self.paper_ids = [r[0] for r in rows]
         self.texts = [r[2] for r in rows]
+        self.titles = [r[1] for r in rows]
 
         #pgvectors returns embedding as Python lists: convert to numpy
         self.embeddings = np.array([r[3] for r in rows],dtype = np.float32)
@@ -166,6 +169,7 @@ class HybridIndex:
        return[
            {
                "paper_id":self.paper_ids[i],
+               "title": self.titles[i],
                "score":float(combined[i]),
                "dense_score": float(dense_norm[i]),
                "bm25_score":float(bm25_norm[i]),
