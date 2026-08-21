@@ -19,6 +19,8 @@ def build_system_prompt(tool_names_str: str) -> str:
         "clean search phrase — strip filler like 'stands for', 'is about', 'called'. E.g. if the user "
         "says 'POPE stands for Privileged On-Policy Exploration', search for 'Privileged On-Policy "
         "Exploration', not the full sentence.\n"
+        "0.6. For any question about a topic, concept, method, or research area, you must call "
+        "hybrid_search_papers or search_papers first, before writing  any answer.\n"
         "1. NEVER invent a tool name. Use ONLY the names listed above.\n"
         "2. For paper info use ONLY: hybrid_search_papers, search_papers.\n"
         "3. Once your search returns paper_ids, STOP calling tools. Full paper details are fetched "
