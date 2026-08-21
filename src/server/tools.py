@@ -12,7 +12,7 @@ import arxiv
 
 from db.citation_verifier import _title_overlap_ration
 from db.db import init_db,get_conn, put_conn
-from db.paper_store import load_all_papers
+#####from db.paper_store import load_all_papers
 from db.semantic_cache import SemanticCache
 
 from server.index_state import _hybrid_index,_semantic_cache,_ensure_index_loaded
@@ -51,12 +51,12 @@ async def hybrid_search_papers(query: str,top_k: int = 5,alpha: float = 0.5)-> d
     # Executes the underlying hybrid search 
     results = _hybrid_index.search(query,top_k=top_k,alpha=alpha)
 
-    papers = load_all_papers()
+   ############# papers = load_all_papers()
 
     #print(f"\n[hybrid_search debug] query='{query}' alpha={alpha}",file=sys.stderr)
     logging.info(f"[hybrid_search debug] query='{query}' alpha={alpha}")
     for r in results:
-        r["title"] = papers.get(r["paper_id"], {}).get("title","Unknown") 
+       ### r["title"] = papers.get(r["paper_id"], {}).get("title","Unknown") 
         # print(f"  {r['paper_id']} | combined={r['score']:.3f} | dense={r['dense_score']:.3f} | bm25={r['bm25_score']:.3f} | {r['title']}",file=sys.stderr)
         logging.info(f"  {r['paper_id']} | combined={r['score']:.3f} | dense={r['dense_score']:.3f} | bm25={r['bm25_score']:.3f} | {r['title']}")
 
