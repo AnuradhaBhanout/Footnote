@@ -61,10 +61,10 @@ class SemanticCache:
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT query, answer, fetched_papers,
-                    1 - (embedding <==> %s::vector) AS similarity
+                    1 - (embedding <=> %s::vector) AS similarity
                     FROM semantic_cache
                     WHERE corpus_version = %s
-                    ORDER BY embedding <==> %s::vector
+                    ORDER BY embedding <=> %s::vector
                     LIMIT 1;
                     """,
                     (query_vec,current_corpus_version,query_vec),
