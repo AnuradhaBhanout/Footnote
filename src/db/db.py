@@ -82,6 +82,11 @@ def init_db():
                         created_at         TIMESTAMP   DEFAULT NOW()
                         );
                   """)
+
+            #HNSW
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS semantic_cache_hnsw ON semantic_cache USING hnsw (embedding vector_cosine_ops);
+            """)
             
             # Add papers
             cur.execute("""
