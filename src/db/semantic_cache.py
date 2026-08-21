@@ -15,40 +15,40 @@ class SemanticCache:
     def __init__(self,model):
         self.model = model
        # self.cache_file = cache_file
-        self.entries: list = []  # this will hold cached answers in memory
-        self._load()
+        #self.entries: list = []  # this will hold cached answers in memory
+        #self._load()
 
 
 
-    def _load(self):
-        """ Load all cache entries from Postgres into memory at startup."""
-        try:
-            conn = get_conn()
-            with conn.cursor() as cur:
-                cur.execute("""
-                            SELECT query, answer, embedding, corpus_version, fetched_papers, created_at
-                            FROM semantic_cache ORDER BY created_at ASC;
-                            """)
-                rows = cur.fetchall()
-            #conn.close()
-            put_conn(conn)
+    # def _load(self):
+    #     """ Load all cache entries from Postgres into memory at startup."""
+    #     try:
+    #         conn = get_conn()
+    #         with conn.cursor() as cur:
+    #             cur.execute("""
+    #                         SELECT query, answer, embedding, corpus_version, fetched_papers, created_at
+    #                         FROM semantic_cache ORDER BY created_at ASC;
+    #                         """)
+    #             rows = cur.fetchall()
+    #         #conn.close()
+    #         put_conn(conn)
 
-            self.entries = [
-                {
-                    "query":  r[0],
-                    "answer": r[1],
-                    "embedding": np.array(r[2],dtype = np.float32),
-                    "corpus_version": r[3],
-                    "fetched_papers": r[4] if r[4] is not None else [],
-                    "created_at": r[5].timestamp() if r[5] else time.time(),
-                }
-                for r in rows
-            ]
+    #         self.entries = [
+    #             {
+    #                 "query":  r[0],
+    #                 "answer": r[1],
+    #                 "embedding": np.array(r[2],dtype = np.float32),
+    #                 "corpus_version": r[3],
+    #                 "fetched_papers": r[4] if r[4] is not None else [],
+    #                 "created_at": r[5].timestamp() if r[5] else time.time(),
+    #             }
+    #             for r in rows
+    #         ]
         
-        except Exception as e:
-            #Dont crash on startup if db is not ready yet.
-            print(f"[semantic_cache] Warning: could not load from DB: {e}") 
-            self.entries = []
+    #     except Exception as e:
+    #         #Dont crash on startup if db is not ready yet.
+    #         print(f"[semantic_cache] Warning: could not load from DB: {e}") 
+    #         self.entries = []
 
 
     def _save(self,entry: dict):
@@ -83,37 +83,46 @@ class SemanticCache:
 
     def lookup(self, query:str, current_corpus_version: str)-> dict | None:
        # print("LOOKing up for previous queries asked by the user")
-        #self._load()
-        if not self.entries:
-            return None
+
         
         # Convert query to list of numbers
-        query_vec = self.model.encode([query],convert_to_numpy=True, normalize_embeddings=True)[0]
-        #query_vec = list(self.model.embed([query]))[0]
+        query_vec = self.model.encode([query],convert_to_numpy=True, normalize_embeddings=True)[0].tolist()
+        
 
-        best_score = -1.0
-        best_entry = None
+        conn = get_conn()
 
-        for entry in self.entries:
+        try:
+            
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT query, answer, fetched_papers,
+                    1 - (embedding <==> %s::vector) AS similarity
+                    FROM semantic_cache
+                    WHERE corpus_version = %s
+                    ORDER BY embedding <==> %s::vector
+                    LIMIT 1;
+                    """,
+                    (query_vec,current_corpus_version,query_vec),
+                    )
+                row = cur.fetchone()
 
-            if entry["corpus_version"] != current_corpus_version:
-                continue
+        finally:
+            put_conn(conn)
 
-            # calculating similarity between query_vec and  cached vec
-            score = float(np.dot(entry["embedding"],query_vec))
 
-            if score > best_score:
-                best_score = score
-                best_entry = entry
+        if row is None:
+           return None
 
-        if best_entry is not None and best_score >= SIMILARITY_THRESHOLD:
-                return {"answer": best_entry["answer"],
-                        "matched_query": best_entry["query"],
-                        "similarity": best_score,
-                        "fetched_papers": best_entry.get("fetched_papers", []),
-                        }
+        matched_query, answer, fetched_papers, similarity = row
+        if similarity < SIMILARITY_THRESHOLD:
+            return None   
 
-        return None
+        return {"answer": answer,
+                "matched_query": matched_query,
+                "similarity": float(similarity),
+                "fetched_papers": fetched_papers if fetched_papers is not None else [   ],
+                }
+
 
 
     def store(self, query: str, answer: str, current_corpus_version: str, fetched_papers: list = None) -> None:
@@ -131,5 +140,5 @@ class SemanticCache:
                 "created_at": time.time(),
             }
         
-        self.entries.append(entry)
+        #########self.entries.append(entry)
         self._save(entry) # Write to disk
