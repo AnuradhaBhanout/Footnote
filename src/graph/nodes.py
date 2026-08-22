@@ -392,24 +392,24 @@ class GraphNodes:
     
 
     async def finalize(self,state: GraphState,config: RunnableConfig)-> GraphState:
-        if state.get("draft_answer") and state["retry_count"] == 0  and state.get("answer_is_reliable", False):
-            await self.chatbot.acquire_agent()
-            try:
-                cache_store_tool = next((t for t in self.chatbot.available_tools if t.name == "store_semantic_cache"), None)
+        # if state.get("draft_answer") and state["retry_count"] == 0  and state.get("answer_is_reliable", False):
+        #     await self.chatbot.acquire_agent()
+        #     try:
+        #         cache_store_tool = next((t for t in self.chatbot.available_tools if t.name == "store_semantic_cache"), None)
         
-                if cache_store_tool is not None and state.get("draft_answer")and state["retry_count"] == 0:
+        #         if cache_store_tool is not None and state.get("draft_answer")and state["retry_count"] == 0:
                         
-                        await cache_store_tool.ainvoke(
-                            {
-                                "query":state["original_query"],
-                                "answer":state["draft_answer"],
-                                "fetched_papers": state.get("fetched_papers", []),
-                            },
-                            config=config
-                        )
-            except Exception as e:
-                logger.error(f"Cache store failed (non-fatal): {e}")
+        #                 await cache_store_tool.ainvoke(
+        #                     {
+        #                         "query":state["original_query"],
+        #                         "answer":state["draft_answer"],
+        #                         "fetched_papers": state.get("fetched_papers", []),
+        #                     },
+        #                     config=config
+        #                 )
+        #     except Exception as e:
+        #         logger.error(f"Cache store failed (non-fatal): {e}")
             
-            finally:
-                await self.chatbot.release_agent()
+        #     finally:
+        #         await self.chatbot.release_agent()
         return state
