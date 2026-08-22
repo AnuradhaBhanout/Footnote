@@ -16,6 +16,8 @@ anyio==4.14.1
     #   sse-starlette
     #   starlette
     #   watchfiles
+arq==0.28.0
+    # via ragchatbot (pyproject.toml)
 arxiv==4.0.0
     # via ragchatbot (pyproject.toml)
 attrs==26.1.0
@@ -45,7 +47,9 @@ cffi==2.0.0
 charset-normalizer==3.4.7
     # via requests
 click==8.4.2
-    # via uvicorn
+    # via
+    #   arq
+    #   uvicorn
 colorama==0.4.6
     # via
     #   click
@@ -91,6 +95,8 @@ h11==0.16.0
     #   httpcore
     #   httpcore2
     #   uvicorn
+hiredis==3.4.1
+    # via redis
 httpcore==1.0.9
     # via httpx
 httpcore2==2.10.0
@@ -317,7 +323,9 @@ pygments==2.20.0
     #   rich
     #   rich-rst
 pyjwt==2.13.0
-    # via mcp
+    # via
+    #   mcp
+    #   redis
 pyperclip==1.11.0
     # via fastmcp-slim
 python-dotenv==1.2.2
@@ -329,6 +337,7 @@ python-multipart==0.0.32
     # via
     #   fastmcp-slim
     #   mcp
+
 pyyaml==6.0.3
     # via
     #   fastmcp-slim
@@ -337,6 +346,8 @@ pyyaml==6.0.3
     #   langchain-core
 rank-bm25==0.2.2
     # via ragchatbot (pyproject.toml)
+redis==5.3.1
+    # via arq
 referencing==0.37.0
     # via
     #   jsonschema
@@ -445,6 +456,8 @@ websockets==15.0.1
     #   fastmcp-slim
     #   langgraph-sdk
     #   langsmith
+win32-setctime==1.2.0
+    # via loguru
 wrapt==2.3.0
     # via langfuse
 xxhash==3.8.0
