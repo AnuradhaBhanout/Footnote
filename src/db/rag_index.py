@@ -186,5 +186,30 @@ class HybridIndex:
         return (scores - scores.min())/(scores.max() - scores.min()) 
 
 
+    def embed_specific(self,paper_ids:list[str]):
+        conn = get_conn()
+        with conn.cursor() as cur:
+
+            cur.execute("SELECT paper_id FROM paper_embeddings WHERE paper_id = ANY(%s)",(paper_ids,)),
+            already_done = {r[0] for r in cur.fetchall()}
+            remaining = [pid for pid in paper_ids if pid not in already_done]
+
+            if not remaining:
+                put_conn(conn)
+                return
 
 
+
+            cur.execute(
+                "SELECT paper_id,title, authors,summary,pdf_url, published FROM papers WHERE paper_id = ANY(%s)",
+                (remaining,)
+            )
+            rows = cur.fetchall()
+
+        put_conn(conn)
+        texts = [paper_to_text({"title":r[1],"summary":r[4]}) for r in rows]
+        titles = [r[1] for r in rows]
+        ids = [r[0] for r in rows]
+
+        embeddings = self.model.encode(texts,convert_to_numpy=True,normalize_embeddings=True,batch_size=8,show_progress_bar=False)
+        self._upsert_to_db(ids,texts,titles,embeddings)
