@@ -87,6 +87,31 @@ async def stream_graph_events(chatbot, graph_input, session_id: str, tags: list[
                 "fetched_papers": fetched_papers,
                 "trace_id": trace_id,
             })
+########### Inserting papers in db ########
+
+            original_query = state.values.get("original_query","")
+            retry_count = state.values.get("retry_count",0)
+
+            if answer and retry_count == 0 and answer_is_reliable:
+                try:
+                    await chatbot.acquire_agent()
+                    try:
+                        cache_store_tool = next((t for t in chatbot.available_tools if t.name == "store_semantic_cache"),None)
+                        if cache_store_tool is not None:
+                           await cache_store_tool.ainvoke(
+                               {
+                                   "query": original_query,
+                                   "answer":answer,
+                                   "fetched_papers": fetched_papers,
+                               },
+                               config = config,
+                           )
+                    finally:
+                        await chatbot.release_agent()
+                except Exception as e:
+                    logger.error(f"Cache store failed (non-fatal): {e}")
+                        
+
         
         except Exception as e:
             logger.error(f"stream error: {e}",exc_info=True)
