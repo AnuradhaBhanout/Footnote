@@ -164,7 +164,7 @@ async def search_papers(topic: str, max_results: int = 5) -> dict:              
     # #_hybrid_index.refresh_if_stale()
     # await asyncio.to_thread(_hybrid_index.refresh_if_stale)
 
-    await request_embed(list(paper_info.keys()))
+    await request_embed(list(paper_ids.keys()))
 
     #return paper_ids
     if not paper_ids:
