@@ -15,7 +15,7 @@ from db.db import init_db,get_conn, put_conn
 #####from db.paper_store import load_all_papers
 from db.semantic_cache import SemanticCache
 
-from server.index_state import _hybrid_index,_semantic_cache,_ensure_index_loaded
+from server.index_state import _hybrid_index,_semantic_cache,_ensure_index_loaded,request_embed
 from server.mcp_app import mcp
 
 from server.relevance import evaluate_relevance,_quoted_phrase
@@ -159,10 +159,12 @@ async def search_papers(topic: str, max_results: int = 5) -> dict:              
 
     await asyncio.to_thread(_insert_papers_sync, papers_info, topic)
 
-    # Checks if new papers have been downloaded to your disk directory (via the standard search_papers tool) since the search index was last built. 
-    # If it detects changes, it automatically regenerates the vector embeddings and updates the BM25 dictionary on-the-fly.
-    #_hybrid_index.refresh_if_stale()
-    await asyncio.to_thread(_hybrid_index.refresh_if_stale)
+    # # Checks if new papers have been downloaded to your disk directory (via the standard search_papers tool) since the search index was last built. 
+    # # If it detects changes, it automatically regenerates the vector embeddings and updates the BM25 dictionary on-the-fly.
+    # #_hybrid_index.refresh_if_stale()
+    # await asyncio.to_thread(_hybrid_index.refresh_if_stale)
+
+    await request_embed(list(paper_info.keys()))
 
     #return paper_ids
     if not paper_ids:
