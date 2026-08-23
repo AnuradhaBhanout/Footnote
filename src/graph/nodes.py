@@ -1,6 +1,7 @@
 import json
 import logging
 import anyio
+import uuid
 
 import httpx
 from langchain_core.messages import HumanMessage, SystemMessage,AIMessage,ToolMessage,trim_messages
@@ -295,17 +296,18 @@ class GraphNodes:
                     raw = await extract_tool.ainvoke({"paper_ids": paper_ids}, config=config)
                     result = _parse_tool_result(raw)
                     fetched_papers = result.get("papers", []) if isinstance(result, dict) else []
+                    extract_call_id = f"deterministic-extract-info-{uuid.uuid4().hex[:8]}"
                     extract_ai_msg = AIMessage(
                         content="",
                         tool_calls = [{
                             "name": "extract_info",
                             "args":{"paper_ids": paper_ids},
-                            "id": "deterministic-extract-info",
+                            "id": "extract_call_id",
                         }],
                     )
                     extract_msg = ToolMessage(
                         content=json.dumps(result),
-                        tool_call_id="deterministic-extract-info",
+                        tool_call_id="extract_call_id",
                         name="extract_info",
                     )
                     agent_messages = agent_messages + [extract_ai_msg,extract_msg]
