@@ -34,30 +34,29 @@ if __name__ == "__main__":
     import uvicorn
     from arq.worker import Worker
     from server.worker import WorkerSettings
+    from contextlib import asynccontextmanager
+    from starlette.applications import Starlette
+    from starlette.routing import Mount
 
-    app = mcp.sse_app()
+    mcp_app = mcp.sse_app()
 
-    async def start_embed_worker():
+    @asynccontextmanager
+    async def lifespan(app):
         worker = Worker(
             functions=WorkerSettings.functions,
             redis_settings = WorkerSettings.redis_settings,
             handle_signals=False,
-        )
+        )       
 
-        app.state.embed_worker =  worker
-        app.state.embed_worker_task = asyncio.create_task(worker.async_run())
+        worker_task = asyncio.create_task(worker.async_run())
 
-    async def stop_embed_worker():
-        task = getattr(app.state,"embed_worker_task",None)
-        worker = getattr(app.state,"embed_worker",None)
-
-        if task:
-            task.cancel()
-        if worker:
+        try:
+            yield
+        finally:
+            worker_task.cancel()
             await worker.close()
 
-    app.add_event_handler("startup",start_embed_worker)
-    app.add_event_handler("shutdown",stop_embed_worker)
+    app = Starlette(routes=[Mount("/", app=mcp_app)], lifespan=lifespan)
 
     uvicorn.run(app, host="0.0.0.0",port=int(os.environ.get("PORT") or 8001))
 
