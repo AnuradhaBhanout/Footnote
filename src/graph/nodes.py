@@ -302,12 +302,12 @@ class GraphNodes:
                         tool_calls = [{
                             "name": "extract_info",
                             "args":{"paper_ids": paper_ids},
-                            "id": "extract_call_id",
+                            "id": extract_call_id,
                         }],
                     )
                     extract_msg = ToolMessage(
                         content=json.dumps(result),
-                        tool_call_id="extract_call_id",
+                        tool_call_id= extract_call_id,
                         name="extract_info",
                     )
                     agent_messages = agent_messages + [extract_ai_msg,extract_msg]
