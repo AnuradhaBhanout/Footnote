@@ -295,12 +295,20 @@ class GraphNodes:
                     raw = await extract_tool.ainvoke({"paper_ids": paper_ids}, config=config)
                     result = _parse_tool_result(raw)
                     fetched_papers = result.get("papers", []) if isinstance(result, dict) else []
+                    extract_ai_msg = AIMessage(
+                        content="",
+                        tool_calls = [{
+                            "name": "extract_info",
+                            "args":{"paper_ids": paper_ids},
+                            "id": "deterministic-extract-info",
+                        }],
+                    )
                     extract_msg = ToolMessage(
                         content=json.dumps(result),
                         tool_call_id="deterministic-extract-info",
                         name="extract_info",
                     )
-                    agent_messages = agent_messages + [extract_msg]
+                    agent_messages = agent_messages + [extract_ai_msg,extract_msg]
  
                     final_pass = [
                         HumanMessage(content=state["current_query"]),
