@@ -44,7 +44,7 @@ class MCP_ChatBot:
             max_tokens=2024,
             max_retries=1,
             timeout=10,
-            model_kwargs={"parallel_tool_calls": False},
+            model_kwargs={"parallel_tool_calls": False, "reasoning_effort": "low"},
         )
  
         self.available_tools = []
