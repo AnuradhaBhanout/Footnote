@@ -12,7 +12,7 @@ from langgraph.graph.message import add_messages
 class GraphState(TypedDict):
     original_query: str
     current_query: str
-    messages: Annotated[list, add_messages]
+    messages: Annotated[list, add_messages,]
     cache_hit: bool
     draft_answer: Optional[str]
     citation_check_passed: bool
