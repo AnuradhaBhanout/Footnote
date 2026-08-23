@@ -63,10 +63,10 @@ class HybridIndex:
         tokenized_corpus = [simple_tokenize(t) for t in self.texts]
         self.bm25 = BM25Okapi(tokenized_corpus)
 
-        self._upsert_to_db(papers)
+        self._upsert_to_db(paper_ids=self.paper_ids, titles=self.titles,texts=self.texts,embeddings=self.embeddings)
 
     
-    def _upsert_to_db(self,papers: dict):
+    def _upsert_to_db(self,*,paper_ids,titles,texts,embeddings):
         """
         Upsert paper embeddings into paper_embeddings table.
         ON CONFLICT updates embedding + text_chunk in case summary changed.
@@ -75,11 +75,11 @@ class HybridIndex:
         rows = [
             (
                 pid,
-                papers[pid].get("title",""),
-                self.texts[i],
-                self.embeddings[i].tolist(),         #pgvector expects a list     
+                titles[i],
+                texts[i],
+                embeddings[i].tolist(),         #pgvector expects a list     
             )
-            for i ,pid in enumerate(self.paper_ids)
+            for i ,pid in enumerate(paper_ids)
         ]
 
         conn = get_conn()
@@ -212,4 +212,4 @@ class HybridIndex:
         ids = [r[0] for r in rows]
 
         embeddings = self.model.encode(texts,convert_to_numpy=True,normalize_embeddings=True,batch_size=8,show_progress_bar=False)
-        self._upsert_to_db(ids,texts,titles,embeddings)
+        self._upsert_to_db(paper_ids=ids, titles=titles,texts=texts, embeddings=embeddings)
