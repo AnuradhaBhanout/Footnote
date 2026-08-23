@@ -3,7 +3,8 @@
 
 
 
-from typing import TypedDict, Optional,Any
+from typing import TypedDict, Optional,Any,Annotated
+from langgraph.graph.message import add_messages
 
 
 
@@ -11,7 +12,7 @@ from typing import TypedDict, Optional,Any
 class GraphState(TypedDict):
     original_query: str
     current_query: str
-    messages: list
+    messages: Annotated[list, add_messages]
     cache_hit: bool
     draft_answer: Optional[str]
     citation_check_passed: bool
