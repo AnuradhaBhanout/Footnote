@@ -117,8 +117,8 @@ class GraphNodes:
 
 
 
-    @staticmethod
-    def _prepare_agent_messages(state: GraphState) -> list:
+    #@staticmethod
+    def _prepare_agent_messages(self,state: GraphState) -> list:
             messages = state["messages"]
 
             if not messages or messages[-1].content != state["current_query"]:
@@ -126,8 +126,8 @@ class GraphNodes:
 
             messages = trim_messages(
                 messages,
-                max_tokens=60,
-                token_counter=len,
+                max_tokens=4000,
+                token_counter=self.llm,
                 strategy="last",
                 include_system=False,
             )
