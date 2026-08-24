@@ -1,9 +1,17 @@
 import json
-from langchain_core.messages import ToolMessage
+from langchain_core.messages import ToolMessage,HumanMessage
 
 from client.mcp_content import parse_mcp_content
 
 SCORE_FLOOR = 0.7
+
+def _current_turn_messages(messages: list) -> list:
+    for i in range(len(messages) -1,-1,-1):
+        if isinstance(messages[i], HumanMessage):
+            return messages[i:]
+
+    return messages
+
 
 def _collect_paper_ids_from_search(messages: list) -> list[str]:
     """Pull every paper_id out of search_papers / hybrid_search_papers tool results,
