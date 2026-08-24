@@ -105,7 +105,8 @@ async def resume(request: ResumeRequest,chatbot:MCP_ChatBot = Depends(get_chatbo
 
 
 
-@app.get("/health")
+
+@app.api_route("/health",methods=["GET","HEAD"])
 async def health(request: Request):
     chatbot = getattr(request.app.state,"chatbot",None)
     db_ok = False
