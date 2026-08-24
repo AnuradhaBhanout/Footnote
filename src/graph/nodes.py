@@ -2,6 +2,12 @@ import json
 import logging
 import anyio
 import uuid
+import tiktoken
+
+_ENC = tiktoken.get_encoding("cl100k_base")
+
+def _count_tokens(messages) -> int:
+    return sum(len(_ENC.encode(str(m.content))) for m in messages)
 
 import httpx
 from langchain_core.messages import HumanMessage, SystemMessage,AIMessage,ToolMessage,trim_messages
@@ -100,6 +106,7 @@ class GraphNodes:
         state = {**state, "fetched_papers": state.get("fetched_papers", [])}
         try:
             messages = self._prepare_agent_messages(state)
+            
             agent_state, fallback_state = await self._invoke_agent_with_recovery(messages, state, config)
             if fallback_state is not None:
                 return fallback_state
@@ -117,8 +124,8 @@ class GraphNodes:
 
 
 
-    #@staticmethod
-    def _prepare_agent_messages(self,state: GraphState) -> list:
+    @staticmethod
+    def _prepare_agent_messages(state: GraphState) -> list:
             messages = state["messages"]
 
             if not messages or messages[-1].content != state["current_query"]:
@@ -127,7 +134,7 @@ class GraphNodes:
             messages = trim_messages(
                 messages,
                 max_tokens=4000,
-                token_counter=self.llm,
+                token_counter=_count_tokens,
                 strategy="last",
                 include_system=False,
             )
