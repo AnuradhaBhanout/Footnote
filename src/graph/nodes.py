@@ -58,8 +58,25 @@ class GraphNodes:
                          "fetched_papers": result.get("fetched_papers", []),
                          "citation_check_passed": True,
                          }
+        except (anyio.ClosedResourceError, McpError):
+            for attempt in range(2):
+                self.chatbot.reconnect_event.set()
+                await self.chatbot.ready_event.wait()
+                try:
+                    raw = await cache_check_tool.ainvoke({"query": state["original_query"]},config=config)
+                    result = _parse_tool_result(raw)
+                    if result.get("hit"):
+                        return{
+                            "cache_hit":True,
+                            "draft_answer":result["answer"],
+                            "fetched_papers":result.get("fetched_papers",[]),
+                            "citation_check_passed":True
+                        }
+                    break
+                except (anyio.ClosedResourceError,McpError):
+                    continue
         except Exception as e:
-            get_client().score_current_trace(name="error", value=1)       #if e else 0)
+            get_client().score_current_trace(name="error", value=1)      
             logger.error(f"Cache check failed:{type(e).__name__}: {e}")
 
         finally:
