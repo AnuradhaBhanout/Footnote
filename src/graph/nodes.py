@@ -23,7 +23,7 @@ from openai import APIError
 from client.mcp_content import parse_mcp_content
 from db.citation_verifier import verify_citations
 
-from graph.helpers import _collect_paper_ids_from_search, _parse_tool_result
+from graph.helpers import _collect_paper_ids_from_search, _parse_tool_result,_current_turn_messages
 from graph.state import GraphState
 
 
@@ -305,7 +305,7 @@ class GraphNodes:
         turned up paper_ids, we call it exactly once, deterministically,
         then force one more LLM pass to write the final answer from the
         extracted details only."""
-        paper_ids = _collect_paper_ids_from_search(agent_messages)
+        paper_ids = _collect_paper_ids_from_search(_current_turn_messages(agent_messages) )
         logger.info(
             f"--- DEBUG: collected paper_ids={paper_ids}, raw tool messages="
             f"{[(type(m.content).__name__, repr(m.content)[:200]) for m in agent_messages if isinstance(m, ToolMessage)]} ---"
