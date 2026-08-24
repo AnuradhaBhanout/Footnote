@@ -281,7 +281,7 @@ class GraphNodes:
         the state dict to return early with, or None if there's nothing
         to clarify."""
         last_ai = next(
-            (m for m in reversed(agent_messages) if isinstance(m, AIMessage) and getattr(m, "tool_calls", None)),
+            (m for m in reversed(_current_turn_messages(agent_messages)) if isinstance(m, AIMessage) and getattr(m, "tool_calls", None)),
             None,
         )
         if not last_ai:
