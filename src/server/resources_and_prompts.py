@@ -93,7 +93,7 @@ Please present both detailed information about each paper and a high-level synth
 
 
 
-@mcp.custom_route("/health", methods=["GET"])
+@mcp.api_route("/health", methods=["GET","HEAD"])
 async def health(request):
     from starlette.responses import JSONResponse
     db_ok = False
