@@ -43,7 +43,7 @@ class GraphNodes:
         # 1. Check if the tool actually exists
             if cache_check_tool is None:
                 logger.warning("Cache tool missing, skipping cache check.")
-                return {**state, "cache_hit": False}
+                return { "cache_hit": False}
 
             
             raw = await cache_check_tool.ainvoke({"query": state["original_query"]},config=config)
@@ -52,7 +52,7 @@ class GraphNodes:
             get_client().score_current_trace(name="cache_hit", value=1 if hit else 0)
             logger.info(f"--- CACHE DEBUG: raw={repr(raw)[:300]}, parsed result={result} ---")
             if hit:
-                return {**state, 
+                return { 
                          "cache_hit": True,
                          "draft_answer": result["answer"],
                          "fetched_papers": result.get("fetched_papers", []),
@@ -65,7 +65,7 @@ class GraphNodes:
         finally:
             await self.chatbot.release_agent()     
        
-        return {**state, "cache_hit": False}
+        return { "cache_hit": False}
 
 
 
