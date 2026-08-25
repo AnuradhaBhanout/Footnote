@@ -3,6 +3,7 @@ from langchain_core.messages import ToolMessage
 
 from client.mcp_content import parse_mcp_content
 from graph.state import GraphState
+from graph.helpers import _current_turn_messages
 
 logger = logging.getLogger("RAG-CHATBOT")
 
@@ -19,7 +20,7 @@ def should_continue_searching(state: GraphState) -> str:
     Conditional edge logic: decide if we need to search again 
     or move to citation checking.
     """
-    messages = state.get("messages", [])
+    messages = _current_turn_messages(state.get("messages", []))
     if not messages:
         return "ok"
 
