@@ -250,7 +250,7 @@ class GraphNodes:
         if clarification is not None:
             return clarification
  
-        agent_messages, fetched_papers, extract_ran = await self._run_deterministic_extraction(
+        agent_messages, fetched_papers, extract_ran, searched = await self._run_deterministic_extraction(
             state, agent_messages, config
         )
  
@@ -270,8 +270,8 @@ class GraphNodes:
             "clarification_question": None,
             "clarification_options": [],
             "retry_count": new_retry_count,
-            "answer_is_reliable": extract_ran,
-            "fetched_papers": fetched_papers if extract_ran else [],
+            "answer_is_reliable": extract_ran if searched else state.get("answer_is_reliable",False),
+            "fetched_papers": fetched_papers if extract_ran else(state.get("fetched_papers",[]) if not searched else []),
         }
  
     @staticmethod
@@ -305,7 +305,9 @@ class GraphNodes:
         turned up paper_ids, we call it exactly once, deterministically,
         then force one more LLM pass to write the final answer from the
         extracted details only."""
-        paper_ids = _collect_paper_ids_from_search(_current_turn_messages(agent_messages) )
+        turn_messages = _current_turn_messages(agent_messages)
+        paper_ids = _collect_paper_ids_from_search(turn_messages )
+        searched = any( isinstance(m,ToolMessage) and getattr(m,"name",None) in ("search_papers","hybrid_search_papers") for m in turn_messages)
         logger.info(
             f"--- DEBUG: collected paper_ids={paper_ids}, raw tool messages="
             f"{[(type(m.content).__name__, repr(m.content)[:200]) for m in agent_messages if isinstance(m, ToolMessage)]} ---"
@@ -352,13 +354,13 @@ class GraphNodes:
                     logger.error(f"run_agent: deterministic extract_info failed: {type(e).__name__}: {e}")
                     # fall through — agent_messages keeps whatever the search-only agent already wrote
  
-        if not extract_ran:
+        if not extract_ran and searched:
             # covers both "nothing found" and "extract_info call failed" —
             # never let the search-agent's "gathering details" placeholder
             # reach the user as a final answer
             agent_messages = agent_messages + [self._no_results_fallback()]
  
-        return agent_messages, fetched_papers, extract_ran
+        return agent_messages, fetched_papers, extract_ran,searched
  
     @staticmethod
     def _no_results_fallback() -> AIMessage:
