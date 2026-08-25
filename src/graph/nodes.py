@@ -377,8 +377,9 @@ class GraphNodes:
         if last_tool:
             data = parse_mcp_content(last_tool.content)
             if data is not None:
+                verdict = data.get("evaluator_verdict") if isinstance(data,dict) else {}
                 results = data.get("results", data.get("papers", [])) if isinstance(data, dict) else data
-                if len(results) == 0:
+                if verdict.get("sufficient") is False or len(results) == 0:
                     new_retry_count += 1
         return new_retry_count
 
