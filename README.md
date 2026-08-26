@@ -6,41 +6,19 @@ The frontend is a separate repo: [RAGchatbot-ui](https://github.com/AnuradhaBhan
 
 ## How it works
 
-```
-POST /chat (SSE)
-      │
-      ▼
-┌─────────────────────────────────────────────┐
-│  check_cache                                 │
-│  semantic match against previously verified  │
-│  answers for the current paper library       │
-└──────────────┬────────────────┬─────────────┘
-               │ hit             │ miss
-               ▼                 ▼
-          return cached   ┌─────────────────────────────┐
-             answer       │  run_agent                   │
-                          │  LangChain agent, tools:      │
-                          │  hybrid_search_papers,        │
-                          │  search_papers, ask_clarification │
-                          └───┬──────────┬────────────────┘
-                              │          │
-              ambiguous query │          │ paper_ids found
-                              ▼          ▼
-                  ┌────────────────┐  ┌─────────────────────────┐
-                  │  clarify        │  │  extract_info            │
-                  │  interrupt,      │  │  one deterministic call, │
-                  │  waits for       │  │  never left to the model │
-                  │  user answer     │  └─────────────┬────────────┘
-                  └────────┬────────┘                 │
-                           │                            ▼
-                           └──────────► run_agent  check_citations
-                                                        │
-                                     ┌──────────────────┼──────────────────┐
-                                     │ passed            │ failed, retries<2 │ failed, retries=2
-                                     ▼                    ▼                    ▼
-                                finalize          retry_with_feedback      fallback
-                                (cache the         (names the exact        ("not enough
-                                 verified answer)   citation problem)      verified info")
+```mermaid
+flowchart TD
+    A["POST /chat (SSE)"] --> B["check_cache<br/>semantic match against previously<br/>verified answers for the current paper library"]
+    B -- hit --> C[return cached answer]
+    B -- miss --> D["run_agent<br/>LangChain agent, tools: hybrid_search_papers,<br/>search_papers, ask_clarification"]
+    D -- ambiguous query --> E["clarify<br/>interrupt, waits for user answer"]
+    D -- paper_ids found --> F["extract_info<br/>one deterministic call, never left to the model"]
+    E -- user answers --> D
+    F --> G[check_citations]
+    G -- passed --> H["finalize<br/>caches the verified answer"]
+    G -- "failed, retries < 2" --> I["retry_with_feedback<br/>names the exact citation problem"]
+    G -- "failed, retries = 2" --> J["fallback<br/>'not enough verified info'"]
+    I --> D
 ```
 
 `hybrid_search_papers` combines BM25 and dense embeddings (`fastembed`) over the saved library, then a separate LLM call judges whether any result actually answers the query, not just shares words with it. Only when that comes back empty does the agent fall back to a live arXiv search.
