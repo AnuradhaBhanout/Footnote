@@ -12,10 +12,10 @@ def _isolate_hybrid_search(monkeypatch):
    
 
 
-def _fake_results():
+def _fake_results(best_title="EDGE-OPD: efficient decoding"):
     return[
-        {"paper_id":"2601.18779v1","score":1.0,"dense_score":1.0,"bm25_score":1.0},
-        {"paper_id":"2605.23493v1","score":0.85,"dense_score":0.9,"bm25_score":0.8},
+        {"paper_id":"2601.18779v1","score":1.0,"dense_score":1.0,"bm25_score":1.0,"title":best_title},
+        {"paper_id":"2605.23493v1","score":0.85,"dense_score":0.9,"bm25_score":0.8,"title":"EDGE-OPD"},
     ]
 
 async def test_evaluator_verdict_when_sufficient(monkeypatch):
@@ -69,7 +69,7 @@ async def test_title_rejects_low_overlap_match(monkeypatch):
 
 
 async def test_title_accept_high_overlap_match(monkeypatch):
-    results = _fake_results()
+    results = _fake_results("POPE: Learning to reason on hard problems via Priviledge On-Policy Exploration")
     monkeypatch.setattr(tools._hybrid_index,"search",lambda query,top_k,alpha:results)
 
     monkeypatch.setattr(
