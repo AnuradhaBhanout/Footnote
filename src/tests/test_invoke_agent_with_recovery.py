@@ -76,7 +76,7 @@ def _state(retry_count=0):
         "draft_answer": None,
         "citation_check_passed": False,
         "citation_issues": [],
-        "retry_count": retry_count,
+        "search_retries": retry_count,
         "clarification_question": None,
         "clarification_options": [],
         "answer_is_reliable": False,
@@ -100,7 +100,7 @@ async def test_graph_recursion_error_returns_2tuple_with_fallback():
 
     assert agent_state is None
     assert fallback is not None
-    assert fallback["retry_count"] == 2
+    assert fallback["search_retries"] == 2
     assert fallback["answer_is_reliable"] is False
     assert fallback["fetched_papers"] == []
     assert "several attempts" in fallback["draft_answer"]
@@ -119,7 +119,7 @@ async def test_mcp_reconnect_exhausts_retries_returns_2tuple_with_fallback():
 
     assert agent_state is None
     assert fallback is not None
-    assert fallback["retry_count"] == 1
+    assert fallback["search_retries"] == 1
     assert "temporarily unavailable" in fallback["draft_answer"]
 
 
@@ -139,7 +139,7 @@ async def test_httpx_read_timeout_retry_fails_returns_2tuple_with_fallback():
 
     assert agent_state is None
     assert fallback is not None
-    assert fallback["retry_count"] == 3
+    assert fallback["search_retries"] == 3
     assert "took too long" in fallback["draft_answer"]
 
 
@@ -212,5 +212,5 @@ async def test_run_agent_survives_reraised_api_error_without_crashing():
 
     assert isinstance(result, dict)
     assert result["answer_is_reliable"] is False
-    assert result["retry_count"] == 1
+    assert result["search_retries"] == 1
     assert "unexpected issue" in result["draft_answer"]
