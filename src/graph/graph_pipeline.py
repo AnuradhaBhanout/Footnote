@@ -20,7 +20,7 @@ def build_graph(llm, chatbot):
     graph.add_node("check_citations",nodes.check_citations)
     graph.add_node("retry_with_feedback",nodes.retry_with_feedback)
     graph.add_node("fallback",nodes.fallback)
-    graph.add_node("finalize",nodes.finalize)
+
 
     graph.set_entry_point("check_cache")
     graph.add_conditional_edges("check_cache",after_cache,{
@@ -43,8 +43,7 @@ def build_graph(llm, chatbot):
     
     graph.add_conditional_edges(
         "check_citations", after_citation_check,{
-            "finalize":"finalize",
-            "end_no_cache":END,
+            "end":END,
             "retry_with_feedback":"retry_with_feedback",
             "fallback":"fallback",
         }
@@ -53,7 +52,7 @@ def build_graph(llm, chatbot):
 
     graph.add_edge("retry_with_feedback","run_agent")
     graph.add_edge("finalize",END)
-    graph.add_edge("fallback",END)
+    
 
     return graph
 

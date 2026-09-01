@@ -427,7 +427,3 @@ class GraphNodes:
 
         }
     
-
-    async def finalize(self,state: GraphState,config: RunnableConfig)-> GraphState:
-
-        return state

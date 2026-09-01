@@ -9,7 +9,7 @@ logger = logging.getLogger("RAG-CHATBOT")
 
 MAX_RETRIES = 2
 
-ACTION_TOOL_NAMES = {"write_file","edit_file","create_directory","move_file","fetch"}
+
 
 def after_cache(state: GraphState)-> str:
     return "end" if state["cache_hit"] else "triage_query"
@@ -56,16 +56,9 @@ def after_run_agent(state: GraphState)-> str:
 
 
 
-def _used_actions_tools(state:GraphState)->bool:
-    for msg in state["messages"]:
-        for tc in getattr(msg,"tool_calls",None) or []:
-            if tc["name"] in ACTION_TOOL_NAMES:
-                return True
-    return False
-
 def after_citation_check(state: GraphState)-> str:
     if state["citation_check_passed"]:
-        return "end_no_cache" if _used_actions_tools(state) else "finalize"
+        return "end"
     if state["retry_count"] >= MAX_RETRIES:
         return "fallback"
     return "retry_with_feedback"
