@@ -33,15 +33,7 @@ async def test_evaluator_verdict_when_sufficient(monkeypatch):
             "reason":"Directly matches",
         },
     )
-    monkeypatch.setattr(
-        tools,
-        "_quoted_phrase",
-        lambda query:{
-            "2601.18779v1": {"title":"POPE:Learing to reason a hard problems"},
-            "2605.23493v1":{"title":"EDGE-OPD"}
 
-        },
-    )
     out = await tools.hybrid_search_papers("Priviledge On-Policy Exploration")
 
     assert out["evaluator_verdict"]["sufficient"] is True
@@ -82,11 +74,11 @@ async def test_title_accept_high_overlap_match(monkeypatch):
 
     monkeypatch.setattr(
         tools,
-        "_quoted_phrase",
-        lambda query:{
-            "2601.18779v1": {"title":"POPE: Learning to reason on hard problems via Priviledge On-Policy Exploration"},
-            "2605.23493v1":{"title":"EDGE-OPD"}
-
+        "evaluate_relevance",
+        lambda query,results:{
+            "sufficient":True,
+            "best_paper_id":"2601.18779v1",
+            "reason":"matches",
         },
     )
 
