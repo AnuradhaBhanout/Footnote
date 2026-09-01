@@ -10,7 +10,7 @@ import sys
 from typing import List
 import arxiv
 
-from db.citation_verifier import _title_overlap_ration
+from db.citation_verifier import _title_overlap_ratio
 from db.db import init_db,get_conn, put_conn
 
 from db.semantic_cache import SemanticCache
@@ -65,7 +65,7 @@ async def hybrid_search_papers(query: str,top_k: int = 5,alpha: float = 0.5)-> d
     quoted = _quoted_phrase(query)
     if quoted and judgment.get("sufficient"):
         best = next((r for r in results if r["paper_id"] == judgment.get("best_paper_id")), None)
-        title_match = _title_overlap_ration(quoted, best["title"]) if best else 0.0
+        title_match = _title_overlap_ratio(quoted, best["title"]) if best else 0.0
         if title_match < 0.7:
             judgment = {
                 "sufficient": False,
