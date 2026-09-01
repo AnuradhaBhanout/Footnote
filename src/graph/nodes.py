@@ -260,7 +260,7 @@ class GraphNodes:
         draft = final.content if final.content else ""
         logger.info("--- NODE END: run_agent completed ---")
  
-        #search_retries = self._next_retry_count(state, agent_state)
+        next_retry_count = self._next_retry_count(state, agent_state)
  
         if not draft:
             logger.warning("--- RUN_AGENT: LLM returned empty content ---")
@@ -271,7 +271,7 @@ class GraphNodes:
             "draft_answer": draft,
             "clarification_question": None,
             "clarification_options": [],
-            "search_retries": state['search_retries']+1,
+            "search_retries": next_retry_count,
             "answer_is_reliable": extract_ran if searched else state.get("answer_is_reliable",False),
             "fetched_papers": fetched_papers if extract_ran else(state.get("fetched_papers",[]) if not searched else []),
         }
@@ -373,7 +373,7 @@ class GraphNodes:
  
     @staticmethod
     def _next_retry_count(state: GraphState, agent_state: dict) -> int:
-        new_retry_count = state["retry_count"]
+        new_retry_count = state["search_retries"]
         last_tool = next(
             (m for m in reversed(agent_state["messages"]) if isinstance(m, ToolMessage)),
             None,

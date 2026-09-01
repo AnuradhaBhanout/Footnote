@@ -59,7 +59,7 @@ def after_run_agent(state: GraphState)-> str:
 def after_citation_check(state: GraphState)-> str:
     if state["citation_check_passed"]:
         return "end"
-    if state["search_retries"] >= MAX_RETRIES:
+    if state["citation_retries"] >= MAX_RETRIES:
         return "fallback"
     return "retry_with_feedback"
     
