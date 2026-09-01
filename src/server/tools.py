@@ -12,7 +12,7 @@ import arxiv
 
 from db.citation_verifier import _title_overlap_ration
 from db.db import init_db,get_conn, put_conn
-#####from db.paper_store import load_all_papers
+
 from db.semantic_cache import SemanticCache
 
 from server.index_state import _hybrid_index,_semantic_cache,_ensure_index_loaded,request_embed
@@ -148,9 +148,6 @@ async def search_papers(topic: str, max_results: int = 5) -> dict:              
     
     # Save updated papers_info to json file
     try:
-        # with open(file_path, "w") as json_file:
-        #     json.dump(papers_info, json_file, indent=2)
-        # print(f"Results are saved in: {file_path}", file=sys.stderr)
         with open(file_path, "w") as json_file:
            for pid, info in papers_info.items():
                json_file.write(json.dumps({pid: info}) + "\n")
@@ -163,8 +160,10 @@ async def search_papers(topic: str, max_results: int = 5) -> dict:              
     # # If it detects changes, it automatically regenerates the vector embeddings and updates the BM25 dictionary on-the-fly.
     # #_hybrid_index.refresh_if_stale()
     # await asyncio.to_thread(_hybrid_index.refresh_if_stale)
-
-    await request_embed(paper_ids)
+    try:
+      await request_embed(paper_ids)
+    except Exception as e:
+        logging.warning(f"embed enqueu is failed, papers unembedded until next refresh: {e}")
 
     #return paper_ids
     if not paper_ids:
