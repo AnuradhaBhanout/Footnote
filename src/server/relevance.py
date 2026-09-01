@@ -30,7 +30,7 @@ def evaluate_relevance(query:str,results:list)->dict:
     if not results:
         return{"sufficient": False,"best_paper_id": None,"reason":"No results retrieved."}
     
-    candidates = "\n".join(f"- {r['paper_id']}: {r['title']}" for r in results)
+    candidates = "\n".join(f"- {r['paper_id']}: {r['title']}\n {r.get('summary',''[:200])}" for r in results)
 
     prompt = f"""You are a strict relevance judge. Query: "{query}"
 
