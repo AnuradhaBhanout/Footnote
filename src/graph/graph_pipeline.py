@@ -51,8 +51,8 @@ def build_graph(llm, chatbot):
 
 
     graph.add_edge("retry_with_feedback","run_agent")
-    graph.add_edge("finalize",END)
     
+    graph.add_edge("fallback",END)
 
     return graph
 
