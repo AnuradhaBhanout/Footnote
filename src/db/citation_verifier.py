@@ -81,9 +81,9 @@ def extract_real_papers_from_tool_results(messages: list) -> dict:
 
 
 
-def _title_overlap_ration(real_title: str,answer_text: str) -> float:
+def _title_overlap_ratio(real_title: str,answer_text: str) -> float:
     """
-    What graction of the real title's significant words actually 
+    What fraction of the real title's significant words actually 
     appear in the answer.
     """
     significant_words = [w.lower().strip(".,:;\"'()")  for w in real_title.split() if len(w)>3 ]
@@ -117,7 +117,7 @@ def verify_citations(answer_text:str,messages:list,overlap_threshold: float = 0.
             continue
 
         real_title= real_papers[paper_id]
-        overlap = _title_overlap_ration(real_title,answer_text)
+        overlap = _title_overlap_ratio(real_title,answer_text)
         if overlap < overlap_threshold:
             issues.append(
             f"paper '{paper_id}' is real, but its actual title (\"{real_title}\")"
