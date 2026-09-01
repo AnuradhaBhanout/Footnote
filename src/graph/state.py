@@ -17,7 +17,6 @@ class GraphState(TypedDict):
     draft_answer: Optional[str]
     citation_check_passed: bool
     citation_issues: list
-    retry_count: int
     clarification_question: Optional[str]
     clarification_options: list
     answer_is_reliable: bool

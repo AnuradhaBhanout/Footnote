@@ -110,7 +110,6 @@ class GraphNodes:
             "current_query": human_answer,
             "clarification_question": None, 
             "clarification_options": [], 
-            "retry_count": 0,
             "search_retries":0,
             "citation_retries":0
             }
