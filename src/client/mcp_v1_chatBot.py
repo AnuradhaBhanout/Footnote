@@ -75,20 +75,6 @@ class MCP_ChatBot:
             self._inflight -= 1
 
 
-
-    # async def _keepalive(self,interval: float = 120):
-    #     while True:
-    #         await asyncio.sleep(interval)
-    #         session = next(iter(self.sessions.values()),None)
-    #         if session is None:
-    #             continue
-    #         try:
-    #             await session.send_ping()
-    #         except Exception as e:
-    #             logger.warning(f"keepalive ping failed,triggering reconnect: {e}")
-    #             self.reconnect_event.set()
-
-
     async def session_manager(self):
         try:
             await self.connect_to_servers()
