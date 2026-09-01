@@ -38,7 +38,7 @@ def should_continue_searching(state: GraphState) -> str:
 
             is_bad = verdict.get("sufficient") is False or len(results) == 0
             
-            if is_bad and state["retry_count"] < MAX_RETRIES:
+            if is_bad and state["search_retries"] < MAX_RETRIES:
                 logger.info(f"--- LOOP: Search results insufficient. Retrying agent. ---")
                 return "retry"
         # except:
@@ -59,7 +59,7 @@ def after_run_agent(state: GraphState)-> str:
 def after_citation_check(state: GraphState)-> str:
     if state["citation_check_passed"]:
         return "end"
-    if state["retry_count"] >= MAX_RETRIES:
+    if state["search_retries"] >= MAX_RETRIES:
         return "fallback"
     return "retry_with_feedback"
     

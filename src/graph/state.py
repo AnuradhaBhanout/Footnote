@@ -22,3 +22,5 @@ class GraphState(TypedDict):
     clarification_options: list
     answer_is_reliable: bool
     fetched_papers: list 
+    search_retries: int
+    citation_retries:int

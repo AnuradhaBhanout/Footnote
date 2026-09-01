@@ -110,7 +110,9 @@ class GraphNodes:
             "current_query": human_answer,
             "clarification_question": None, 
             "clarification_options": [], 
-            "retry_count": 0
+            "retry_count": 0,
+            "search_retries":0,
+            "citation_retries":0
             }
 
 
@@ -134,7 +136,7 @@ class GraphNodes:
             return {
                 **state,
                 "draft_answer": "I ran into an unexpected issue processing that — please try again.",
-                "retry_count": state["retry_count"] + 1,
+                "search_retries": state["search_retries"] + 1,
                 "answer_is_reliable": False,
             }
 
@@ -179,7 +181,7 @@ class GraphNodes:
             return None,{
                 **state,
                 "draft_answer": "I couldn't find anything matching that after several attempts — could you try a different phrasing or a known paper title?",
-                "retry_count": state["retry_count"] + 1,
+                "search_retries": state["search_retries"] + 1,
                 "answer_is_reliable": False,
                 "fetched_papers": [],
             }
@@ -197,7 +199,7 @@ class GraphNodes:
                         return None,{
                             **state,
                             "draft_answer": "The research service is temporarily unavailable — please try again in a moment.",
-                            "retry_count": state["retry_count"] + 1,
+                            "search_retries": state["search_retries"] + 1,
                             "answer_is_reliable": False, 
                         }
         except httpx.ReadTimeout:
@@ -208,7 +210,7 @@ class GraphNodes:
                 logger.error(f"run_agent: retry after timeout also failed: {type(e2).__name__}: {e2}")
                 return None,{**state,
                         "draft_answer": "The model took too long to respond — please try again.",
-                        "retry_count": state["retry_count"] + 1,
+                        "search_retries": state["search_retries"] + 1,
                         "answer_is_reliable": False}
             
         except APIError as e:
@@ -220,7 +222,7 @@ class GraphNodes:
                     logger.error(f"run_agent: retry also failed: {type(e2).__name__}: {e2}")
                     return None,{**state,
                             "draft_answer": "I had trouble processing that — could you try rephrasing?", 
-                            "retry_count": state["retry_count"] + 1,
+                            "search_retries": state["search_retries"] + 1,
                             "answer_is_reliable": False}
             else:
                 raise
@@ -231,7 +233,7 @@ class GraphNodes:
             logger.error(f"run_agent: unhandled exception from call_agent: {type(e).__name__}: {e}", exc_info=True)
             return None,{**state,
                     "draft_answer": "I ran into an unexpected issue processing that — please try again.",
-                    "retry_count": state["retry_count"] + 1,
+                    "search_retries": state["search_retries"] + 1,
                     "answer_is_reliable": False}
         
         return agent_state,None
@@ -258,7 +260,7 @@ class GraphNodes:
         draft = final.content if final.content else ""
         logger.info("--- NODE END: run_agent completed ---")
  
-        new_retry_count = self._next_retry_count(state, agent_state)
+        #search_retries = self._next_retry_count(state, agent_state)
  
         if not draft:
             logger.warning("--- RUN_AGENT: LLM returned empty content ---")
@@ -269,7 +271,7 @@ class GraphNodes:
             "draft_answer": draft,
             "clarification_question": None,
             "clarification_options": [],
-            "retry_count": new_retry_count,
+            "search_retries": state['search_retries']+1,
             "answer_is_reliable": extract_ran if searched else state.get("answer_is_reliable",False),
             "fetched_papers": fetched_papers if extract_ran else(state.get("fetched_papers",[]) if not searched else []),
         }
@@ -415,7 +417,7 @@ class GraphNodes:
             f"Use ONLY the exact paper_id/title pairs returned by the tools - do not"
             f"Invent or alter any title, author, or finding."
         )
-        return {**state,"current_query": corrective_query,"retry_count": state["retry_count"]+1}
+        return {**state,"current_query": corrective_query,"citation_retries": state["citation_retries"]+1}
     
 
     def fallback(self,state: GraphState)->GraphState:
