@@ -9,7 +9,7 @@ import server.tools as tools
 @pytest.fixture(autouse=True)
 def _isolate_hybrid_search(monkeypatch):
     monkeypatch.setattr(tools,"_ensure_index_loaded",lambda:None)
-    monkeypatch.setattr(tools,"load_all_papers",lambda:{})
+   
 
 
 def _fake_results():
