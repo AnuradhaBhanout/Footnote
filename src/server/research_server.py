@@ -26,7 +26,7 @@ logging.basicConfig(
 
 
 from server .mcp_app import mcp
-from server import tools, resources_and_prompts
+from server import tools
 
 
 if __name__ == "__main__":
