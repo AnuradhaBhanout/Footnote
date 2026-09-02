@@ -10,7 +10,7 @@ from dotenv import load_dotenv,find_dotenv
 
 _ = load_dotenv(find_dotenv())
 DATABASE_URL = os.getenv("DATABASE_URL")
-_pool = psycopg2.pool.SimpleConnectionPool(1,10,DATABASE_URL,connect_timeout =10)
+_pool = psycopg2.pool.SimpleConnectionPool(1,5,DATABASE_URL,connect_timeout =10)
 
 
 
