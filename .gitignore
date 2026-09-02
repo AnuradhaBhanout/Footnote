@@ -15,3 +15,7 @@ faiss_index/
 # OS files
 .DS_Store
 Thumbs.db
+
+memcheck.py
+body.json
+resume.json
