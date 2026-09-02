@@ -4,8 +4,7 @@ import os
 import uuid
 from contextlib import AsyncExitStack
 from typing import Dict
- 
-import nest_asyncio
+
 from dotenv import find_dotenv, load_dotenv
 from langchain.agents import create_agent
 from langchain_mcp_adapters.tools import convert_mcp_tool_to_langchain_tool
@@ -21,7 +20,7 @@ from client.tools import ask_clarification
 from graph.graph_pipeline import build_graph
 from log_setup import setup_logging
  
-nest_asyncio.apply()
+
  
 logger = setup_logging("RAG-Chatbot", "debug.log")
  
