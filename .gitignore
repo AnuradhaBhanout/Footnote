@@ -19,3 +19,4 @@ Thumbs.db
 memcheck.py
 body.json
 resume.json
+.fastembed_cache/
