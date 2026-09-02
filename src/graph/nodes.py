@@ -249,7 +249,7 @@ class GraphNodes:
         )
  
         clarification = self._extract_clarification_request(state, agent_messages)
-        if clarification is not None:
+        if clarification is not None and state.get("clarify_count", 0) < 1:
             return clarification
  
         agent_messages, fetched_papers, extract_ran, searched = await self._run_deterministic_extraction(
