@@ -1,8 +1,6 @@
-#from arq import create_pool
-#from arq.connections import RedisSettings
-import os
+
 import asyncio
-#_redis_pool  = None
+
 
 
 from db.rag_index import HybridIndex
@@ -25,15 +23,7 @@ def _ensure_index_loaded():
         _index_loaded = True
 
 
-# async def get_redis_pool():
-#     global _redis_pool
-#     if _redis_pool is None:
-#         _redis_pool = await create_pool(RedisSettings.from_dsn(os.getenv("REDIS_URL")))
-#     return _redis_pool
 
-# async def request_embed(paper_ids:list[str]):
-#     pool = await get_redis_pool()
-#     await pool.enqueue_job("embed_papers",paper_ids)
 
 async def request_embed(paper_ids: list[str]):
     asyncio.create_task(asyncio.to_thread(_hybrid_index.embed_specific, paper_ids))
