@@ -101,7 +101,9 @@ async def chat(request: ChatRequest ,chatbot: MCP_ChatBot = Depends(get_chatbot)
 
 @app.post("/resume")
 async def resume(request: ResumeRequest,chatbot:MCP_ChatBot = Depends(get_chatbot)):
-
+    state = await chatbot.app.aget_state({"configurable": {"thread_id": request.session_id}})
+    if not state.next:
+        raise HTTPException(404, "No paused session with that id")
    
     return StreamingResponse(
         stream_graph_events(chatbot,Command(resume=request.answer),request.session_id,tags=["resume"]),
