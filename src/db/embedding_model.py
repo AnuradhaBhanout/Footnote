@@ -4,7 +4,14 @@ import numpy as np
 class EmbeddingModel:
 
     def __init__(self, model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
-        self._model = TextEmbedding(model_name=model_name)
+        self._model_name = model_name
+        self._embedder = None
+
+    @property
+    def embedder(self):
+        if self._embedder is None:
+            self._embedder = TextEmbedding(model_name=self._model_name)
+        return self._embedder
 
     def encode(self,texts,convert_to_numpy: bool = True,
                normalize_embeddings: bool = True,
@@ -15,7 +22,8 @@ class EmbeddingModel:
         if isinstance(texts,str):
             texts = [texts]
 
-        embeddings = list(self._model.embed(texts,batch_size=batch_size))
+        
+        embeddings = list(self.embedder.embed(texts,batch_size=batch_size))
         arr = np.asarray(embeddings,dtype=np.float32)
 
         if normalize_embeddings:
