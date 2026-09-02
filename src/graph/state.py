@@ -23,3 +23,4 @@ class GraphState(TypedDict):
     fetched_papers: list 
     search_retries: int
     citation_retries:int
+    clarify_count: int
