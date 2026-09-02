@@ -48,8 +48,8 @@ def should_continue_searching(state: GraphState) -> str:
 
 
 
-def after_run_agent(state: GraphState)-> str:   
-    if state.get("clarification_question"):
+def after_run_agent(state: GraphState) -> str:
+    if state.get("clarification_question") and state.get("clarify_count", 0) < 1:
         return "clarify"
     return should_continue_searching(state)
 
