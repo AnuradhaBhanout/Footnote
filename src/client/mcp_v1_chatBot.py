@@ -76,7 +76,7 @@ class MCP_ChatBot:
 
     async def session_manager(self):
         try:
-            await self.connect_to_servers()
+            await self._connect_with_retry()
             await self._build_agent_and_graph()
             self.ready_event.set()
             #asyncio.create_task(self._keepalive())
