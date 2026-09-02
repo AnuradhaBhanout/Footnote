@@ -1,5 +1,5 @@
 import asyncio
-import json
+
 import os
 import uuid
 from contextlib import AsyncExitStack
@@ -228,15 +228,11 @@ class MCP_ChatBot:
         self.exit_stack = AsyncExitStack()
  
         try:
-            with open("server_config.json", "r") as file:
-                data = json.load(file)
- 
-            for server_name, server_config in data.get("mcpServers", {}).items():
-                print(f"{server_name} JSON printed {server_config}")
-                await self.connect_to_server(server_name, server_config)
- 
+            port = int(os.environ.get("PORT") or 8000)
+            url = os.getenv("MCP_URL") or f"http://127.0.0.1:{port}/mcp/sse"
+            await self.connect_to_server("research", {"url": url})
         except Exception as e:
-            print(f"Error loading server configuration: {e}")
+            print(f"Error connecting to MCP server: {e}")
             raise
  
     async def cleanup(self):
