@@ -24,6 +24,9 @@ def _ensure_index_loaded():
 
 
 
+_bg_tasks = set()
 
 async def request_embed(paper_ids: list[str]):
-    asyncio.create_task(asyncio.to_thread(_hybrid_index.embed_specific, paper_ids))
+    t = asyncio.create_task(asyncio.to_thread(_hybrid_index.embed_specific, paper_ids))
+    _bg_tasks.add(t)
+    t.add_done_callback(_bg_tasks.discard)
