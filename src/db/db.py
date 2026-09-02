@@ -36,7 +36,7 @@ def put_conn(conn):
 
 def init_db():
     """"Create required table and extensions if they dont exist.
-    call once at server startup(research_server.py)
+    call once at server 
     """
     conn = psycopg2.connect(DATABASE_URL,connect_timeout=10)
     with conn:
