@@ -87,6 +87,7 @@ async def chat(request: ChatRequest ,chatbot: MCP_ChatBot = Depends(get_chatbot)
                 "messages": [],
                 "search_retries":0,
                 "citation_retries":0,
+                "clarify_count":0,
     }
 
 
