@@ -107,11 +107,12 @@ class GraphNodes:
         return {
             **state, 
             "messages": updated_messages,
-            "current_query": human_answer,
+            "current_query": f"{state['original_query']} — user clarified: {human_answer}",
             "clarification_question": None, 
             "clarification_options": [], 
             "search_retries":0,
-            "citation_retries":0
+            "citation_retries":0,
+            "clarify_count": state.get("clarify_count", 0) + 1,
             }
 
 
