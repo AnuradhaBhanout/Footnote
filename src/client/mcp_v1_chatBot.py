@@ -3,16 +3,16 @@ import asyncio
 import os
 import uuid
 from contextlib import AsyncExitStack
-from typing import Dict
 
+from mcp import ClientSession
 from dotenv import find_dotenv, load_dotenv
 from langchain.agents import create_agent
 from langchain_mcp_adapters.tools import convert_mcp_tool_to_langchain_tool
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-from mcp import ClientSession, StdioServerParameters
+
 from mcp.client.sse import sse_client
-from mcp.client.stdio import stdio_client
+
 from psycopg_pool import AsyncConnectionPool
  
 from client.agent_prompt import build_system_prompt, filter_search_tools
@@ -119,16 +119,9 @@ class MCP_ChatBot:
     async def connect_to_server(self, server_name: str, server_config: dict) -> None:
         """connect to a single MCP server and adapt tools natively into LangChain"""
         try:
-            if "url" in server_config:
-                # SSE transport
-                transport = await self.exit_stack.enter_async_context(
-                    sse_client(server_config["url"])
-                )
-            else:
-                server_params = StdioServerParameters(**server_config)
-                transport = await self.exit_stack.enter_async_context(
-                    stdio_client(server_params)
-                )
+            transport = await self.exit_stack.enter_async_context(
+                sse_client(server_config["url"])
+            )
  
             read, write = transport
             session = await self.exit_stack.enter_async_context(
