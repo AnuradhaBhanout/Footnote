@@ -249,9 +249,11 @@ class GraphNodes:
         )
  
         clarification = self._extract_clarification_request(state, agent_messages)
-        if clarification is not None and state.get("clarify_count", 0) < 1:
-            return clarification
- 
+        if clarification is not None:
+            if state.get("clarify_count", 0) < 1:
+                return clarification
+            agent_messages = agent_messages + await self._force_search(state, config)
+
         agent_messages, fetched_papers, extract_ran, searched = await self._run_deterministic_extraction(
             state, agent_messages, config
         )
@@ -363,7 +365,35 @@ class GraphNodes:
             agent_messages = agent_messages + [self._no_results_fallback()]
  
         return agent_messages, fetched_papers, extract_ran,searched
- 
+
+
+
+    async def _force_search(self, state: GraphState, config: RunnableConfig):
+        """Clarification cap reached and the agent asked again instead of
+        searching. Call hybrid_search_papers ourselves on the original query
+        and splice the result in, so the normal extraction path can run."""
+        tool = next((t for t in self.chatbot.available_tools if t.name == "hybrid_search_papers"), None)
+        if tool is None:
+            return []
+        call_id = f"forced-search-{uuid.uuid4().hex[:8]}"
+        try:
+            raw = await tool.ainvoke({"query": state["original_query"]}, config=config)
+            result = _parse_tool_result(raw)
+        except Exception as e:
+            logger.error(f"run_agent: forced search failed: {type(e).__name__}: {e}")
+            return []
+        logger.info(f"--- FORCED SEARCH after clarify cap: query={state['original_query']!r}")
+        return [
+            AIMessage(content="", tool_calls=[{
+                "name": "hybrid_search_papers",
+                "args": {"query": state["original_query"]},
+                "id": call_id,
+            }]),
+            ToolMessage(content=json.dumps(result), tool_call_id=call_id, name="hybrid_search_papers"),
+        ]
+
+
+
     @staticmethod
     def _no_results_fallback() -> AIMessage:
         return AIMessage(content=(
