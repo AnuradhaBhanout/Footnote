@@ -63,7 +63,7 @@ app.add_middleware(
 
 )
 
-app.mount("/mcp", mcp.sse_app(mount_path="/mcp"))
+app.mount("/mcp", mcp.sse_app())
 
 
 _sse_HEADERS = {
