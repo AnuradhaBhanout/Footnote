@@ -14,7 +14,9 @@ from api.schemas import ChatRequest,ResumeRequest
 from api.sse import stream_graph_events
 from client.mcp_v1_chatBot import MCP_ChatBot
 from log_setup import setup_logging
-
+from db.db import init_db
+from server.mcp_app import mcp
+from server import tools 
 
  
 load_dotenv(find_dotenv())
@@ -26,9 +28,9 @@ logger = setup_logging("RAG-API","api-debug.log")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    from client.mcp_v1_chatBot import MCP_ChatBot
 
     chatbot = MCP_ChatBot()
+    init_db()                            # creates tables
     session_task = asyncio.create_task(chatbot.session_manager())
     app.state.chatbot = chatbot
     app.state.session_task = session_task
@@ -60,6 +62,8 @@ app.add_middleware(
     allow_headers=["*"],
 
 )
+
+app.mount("/mcp", mcp.sse_app(mount_path="/mcp"))
 
 
 _sse_HEADERS = {
