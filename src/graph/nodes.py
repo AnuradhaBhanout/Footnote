@@ -60,8 +60,10 @@ class GraphNodes:
                          }
         except (anyio.ClosedResourceError, McpError):
             for attempt in range(2):
+                await self.chatbot.release_agent()
                 self.chatbot.reconnect_event.set()
                 await self.chatbot.ready_event.wait()
+                await self.chatbot.acquire_agent()
                 try:
                     raw = await cache_check_tool.ainvoke({"query": state["original_query"]},config=config)
                     result = _parse_tool_result(raw)
@@ -188,8 +190,10 @@ class GraphNodes:
 
         except (anyio.ClosedResourceError, McpError):
             for attempt in range(2):
+                await self.chatbot.release_agent()
                 self.chatbot.reconnect_event.set()
                 await self.chatbot.ready_event.wait()
+                await self.chatbot.acquire_agent()
                 try:
                     agent_state = await call_agent(10)   #22
                     break
