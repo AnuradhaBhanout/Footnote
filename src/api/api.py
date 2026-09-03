@@ -126,17 +126,3 @@ async def health(request: Request):
         except Exception:
             db_ok = False
     return {"status": "ok", "ready": chatbot is not None and chatbot.ready_event.is_set(), "db": db_ok}
-
-
-
-@app.get("/debug/cache")
-async def debug_cache():
-    import os
-    p = os.getenv("FASTEMBED_CACHE_PATH", "/tmp/fastembed_cache")
-    if not os.path.isdir(p):
-        return {"path": p, "exists": False}
-    total = sum(
-        os.path.getsize(os.path.join(r, f))
-        for r, _, fs in os.walk(p) for f in fs
-    )
-    return {"path": p, "exists": True, "mb": round(total / 1e6), "entries": os.listdir(p)}
