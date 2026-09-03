@@ -2,7 +2,7 @@ from langchain_core.tools import tool
  
  
 @tool
-def ask_clarification(question: str, options: list[str] | None = None) -> str:
+def ask_clarification(question: str) -> str:
     """Call this INSTEAD of any search  tool when the user's request is ambiguous,
        uses an unclear abbreviation/name, or is missing a detail needed  to act.
        Do NOT call this together with any other tool in the same turn.
