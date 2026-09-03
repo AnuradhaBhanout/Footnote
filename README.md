@@ -209,7 +209,6 @@ uvicorn api.api:app --host 0.0.0.0 --port $PORT --workers 1
 | Variable | Why |
 |---|---|
 | `FASTEMBED_CACHE_PATH` | fastembed defaults to `/tmp`, which does not survive a restart, so the model would be re-downloaded on every cold start. Point it inside the project directory and the build-step prefetch above bakes it into the image |
-| `MALLOC_ARENA_MAX=2` | the code is thread-heavy via `asyncio.to_thread`; capping glibc's per-thread arenas meaningfully lowers RSS |
 
 Deployed on Render's free tier, which spins down after roughly 15 minutes idle. The first request after that incurs a cold start while the container boots and the ONNX model loads from disk. Production would run on always-on compute.
 
