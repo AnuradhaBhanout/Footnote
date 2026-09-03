@@ -8,8 +8,6 @@ def ask_clarification(question: str, options: list[str] | None = None) -> str:
        Do NOT call this together with any other tool in the same turn.
        Args:
           questions: A plain-language clarifying question for the user.
-          options: 2-4 short possible interpretations to help the user answer quickly.
  
     """
-    options = options or []
     return "CLARIFICATION_REQUESTED"
