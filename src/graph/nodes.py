@@ -394,6 +394,26 @@ class GraphNodes:
 
 
 
+
+    async def _grounded_clarification_options(self, state: GraphState, config: RunnableConfig)->list[str] :
+        """Options the user picks from must name papers that actually exits.
+        Search on the original query and offer real titles back, rather than
+        titles the model invented.  """
+        tool = next((t for t in self.chatbot.available_tools if t.name == "hybrid_search_papers"), None)
+        if tool is None:
+            return []
+        
+        try:
+            raw = await tool.ainvoke({"query": state["original_query"],"top_k": 3}, config=config)
+            result = _parse_tool_result(raw)
+        except Exception as e:
+            logger.error(f"clarification options search failed: {type(e).__name__}: {e}")
+            return []
+        
+        return [ r["title"] for r in  result.get("results",[]) if isinstance(r,dict) and r.get("title")][:3]
+
+
+
     @staticmethod
     def _no_results_fallback() -> AIMessage:
         return AIMessage(content=(
