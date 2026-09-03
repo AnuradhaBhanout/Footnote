@@ -1,17 +1,17 @@
 # Delve
 
-**Most RAG systems answer confidently whether or not the retrieval worked. This one checks itself and refuses.**
+**Most AI agents hand you whatever the model produced. This one checks the answer against what its tools actually returned — and refuses when they don't match.**
 
 [Live demo](https://ragchatbot-ui-three.vercel.app) · [Frontend repo](https://github.com/AnuradhaBhanout/RAGchatbot-ui)
 
-Delve answers questions about a saved library of arXiv papers. What makes it different is what happens between generation and display:
+Delve is a LangGraph agent pipeline over a shared library of arXiv papers. Retrieval is one node in it; the rest of the graph exists to constrain what the agent is allowed to do with what it retrieves:
 
 - **Every citation is verified against tool output before the user sees it.** An invented arXiv ID fails; a real ID wrapped around an invented title or finding also fails. Either one sends the draft back with the specific problem named, and after two failures the answer becomes *"not enough verified information"* instead of a plausible guess.
 - **The graph calls `extract_info` itself, exactly once.** Fetching paper details is too important to leave to the model's discretion, so it's a deterministic step in the pipeline, not a tool the agent decides to call.
 - **Failure modes are bounded by code, not by prompt instructions.** Recursion limits, retry caps, a one-clarification ceiling with a forced-search fallback, and a five-branch recovery cascade around the agent call — each one a control the model cannot talk its way past.
 - **Answers are cached only when the pipeline says they're trustworthy.** Reliable flag set, zero retries, keyed to a fingerprint of the current library so it self-invalidates the moment the corpus changes.
 
-Built on LangGraph, MCP, FastAPI/SSE, hybrid BM25 + dense retrieval over pgvector, with Langfuse tracing end to end. Deployed as a single Render service. The frontend (React + Vite, on Vercel) lives in a separate repo; this one is the backend. Formerly named RAGchatbot.
+Built on LangGraph for orchestration, MCP for the tool layer, FastAPI/SSE for streaming, with hybrid BM25 + dense retrieval over pgvector and Langfuse tracing end to end. Deployed as a single Render service. The frontend (React + Vite, on Vercel) lives in a separate repo; this one is the backend. Formerly named RAGchatbot.
 
 ## How it works
 
@@ -32,7 +32,7 @@ flowchart TD
     I --> D
 ```
 
-`hybrid_search_papers` combines BM25 and dense embeddings (`fastembed`) over the saved library, then a separate LLM call judges whether any result actually answers the query, not just shares words with it. Only when that comes back empty does the agent fall back to a live arXiv search.
+`hybrid_search_papers` combines BM25 and dense embeddings (`fastembed`) over the indexed library, then a separate LLM call judges whether any result actually answers the query, not just shares words with it. Only when that comes back empty does the agent fall back to a live arXiv search.
 
 The graph has six nodes: `check_cache`, `run_agent`, `clarify`, `check_citations`, `retry_with_feedback`, `fallback`. Caching a verified answer happens in the SSE layer after the graph finishes, not in a graph node.
 
@@ -238,7 +238,6 @@ cd src && pytest
 
 Stated rather than hidden, because they shape what the system can and can't do:
 
-- **Retrieval is abstract-level.** One embedding per paper, built from title + arXiv abstract, with no chunking of full text. Hybrid retrieval over five sentences per document is a weaker use of the technique than it would be over chunked PDFs.
 - **No offline retrieval eval.** Quality is observed through Langfuse scores (`cache_hit`, `citation_pass_rate`) in production. There is no frozen query set with expected paper IDs, so a retrieval change cannot be regressed against a number.
 - **Clarification options aren't verified.** `ask_clarification` arguments are model-generated and don't pass through `citation_verifier`, so the options it offers can name papers that aren't in the library.
 - **No rate limiting.** Under concurrent load, a 429 from the LLM provider degrades to a fallback answer rather than being queued or retried with backoff.
