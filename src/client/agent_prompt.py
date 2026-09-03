@@ -24,7 +24,7 @@ def build_system_prompt(tool_names_str: str) -> str:
             "if hybrid_search_papers comes back empty or has 'evaluator_verdict.sufficient: false.\n"
         "4. When resolving vague references ('this', 'it', 'that paper', 'these results'), use the "
            "conversation history above to figure out what they refer to. If ask_clarification is needed, "
-           "ground the question and options in the actual topic/papers already discussed — never offer "
+           "ground the question in the actual topic/papers already discussed — never offer "
            "generic example topics unrelated to the conversation.\n"
 
         "SEARCH_EXECUTION_RULES:\n"
