@@ -13,7 +13,7 @@ def build_system_prompt(tool_names_str: str) -> str:
         "CRITICAL TOOL RULES:\n"
         "1. FIRST, judge if the request is clear enough to act on. If it uses a short/ambiguous "
             "term, refers to 'that paper' or similar without specifying which, or is missing a needed "
-            "detail — call ask_clarification with a plain-language question and 2-4 short options. "
+            "detail — call ask_clarification with a plain-language question. "
             "Do NOT call any other tool in the same turn if you call ask_clarification.\n"
         "2. When calling search_papers or hybrid_search_papers, extract the core topic/title as a "
            "clean search phrase — strip filler like 'stands for', 'is about', 'called'. E.g. if the user "
