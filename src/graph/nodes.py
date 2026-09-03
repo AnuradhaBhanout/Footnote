@@ -397,7 +397,7 @@ class GraphNodes:
 
 
     async def _grounded_clarification_options(self, state: GraphState, config: RunnableConfig)->list[str] :
-        """Options the user picks from must name papers that actually exits.
+        """Options the user picks from must name papers that actually exist .
         Search on the original query and offer real titles back, rather than
         titles the model invented.  """
         tool = next((t for t in self.chatbot.available_tools if t.name == "hybrid_search_papers"), None)
