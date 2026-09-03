@@ -279,7 +279,7 @@ class GraphNodes:
             "clarification_question": None,
             "clarification_options": [],
             "search_retries": next_retry_count,
-            "answer_is_reliable": extract_ran if searched else state.get("answer_is_reliable",False),
+            "answer_is_reliable": extract_ran ,
             "fetched_papers": fetched_papers if extract_ran else(state.get("fetched_papers",[]) if not searched else []),
         }
  
