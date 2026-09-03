@@ -251,6 +251,7 @@ class GraphNodes:
         clarification = self._extract_clarification_request(state, agent_messages)
         if clarification is not None:
             if state.get("clarify_count", 0) < 1:
+                clarification["clarification_options"] = await self._grounded_clarification_options(state,config)
                 return clarification
             agent_messages = agent_messages + await self._force_search(state, config)
 
