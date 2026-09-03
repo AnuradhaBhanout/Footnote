@@ -301,7 +301,7 @@ class GraphNodes:
             **state,
             "messages": agent_messages,
             "clarification_question": args.get("question", "Could you clarify?"),
-            "clarification_options": args.get("options", []),
+            "clarification_options":  [],
         }
  
     async def _run_deterministic_extraction(self, state: GraphState, agent_messages: list, config: RunnableConfig):
