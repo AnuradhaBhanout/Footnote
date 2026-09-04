@@ -1,15 +1,15 @@
-# Delve
+# Footnote
 
 **Most AI agents hand you whatever the model produced. This one checks the answer against what its tools actually returned — and refuses when they don't match.**
 
 [Live demo](https://ragchatbot-ui-three.vercel.app) · [Frontend repo](https://github.com/AnuradhaBhanout/RAGchatbot-ui)
 
-Delve is a LangGraph agent pipeline over a shared library of arXiv papers. Retrieval is one node in it; the rest of the graph exists to constrain what the agent is allowed to do with what it retrieves:
+Footnote is a LangGraph agent pipeline over a shared library of arXiv papers. Retrieval is one node in it; the rest of the graph exists to constrain what the agent is allowed to do with what it retrieves:
 
 - **Every citation is verified against tool output before the user sees it.** An invented arXiv ID fails; a real ID wrapped around an invented title or finding also fails. Either one sends the draft back with the specific problem named, and after two failures the answer becomes *"not enough verified information"* instead of a plausible guess.
 - **The graph calls `extract_info` itself, exactly once.** Fetching paper details is too important to leave to the model's discretion, so it's a deterministic step in the pipeline, not a tool the agent decides to call.
 - **Failure modes are bounded by code, not by prompt instructions.** Recursion limits, retry caps, a one-clarification ceiling with a forced-search fallback, and a five-branch recovery cascade around the agent call — each one a control the model cannot talk its way past.
-- **Answers are cached only when the pipeline says they're trustworthy.** Reliable flag set, zero retries, keyed to a fingerprint of the current library so it self-invalidates the moment the corpus changes.
+- **Answers are cached only when this turn earned it.** The reliability flag is set by the turn that produced the answer, not inherited from earlier in the session — a turn that answers from conversation history without retrieving is never cached. Zero retries required, and the key is fingerprinted against the current library so the cache self-invalidates when the corpus changes.
 
 Built on LangGraph for orchestration, MCP for the tool layer, FastAPI/SSE for streaming, with hybrid BM25 + dense retrieval over pgvector and Langfuse tracing end to end. Deployed as a single Render service. The frontend (React + Vite, on Vercel) lives in a separate repo; this one is the backend. Formerly named RAGchatbot.
 
@@ -41,8 +41,8 @@ The graph has six nodes: `check_cache`, `run_agent`, `clarify`, `check_citations
 - **Hybrid retrieval with an LLM relevance judge**: BM25 + dense embeddings narrow the candidates, then a strict judge model decides if any of them is actually relevant before the agent is allowed to use them
 - **Deterministic citation extraction**: the graph batches exactly one `extract_info` call itself once search settles on paper IDs, instead of leaving the model to decide how many times to fetch details
 - **Post-hoc citation verification**: every paper ID and title an answer cites is checked against real tool output; a fabricated or mismatched citation triggers a corrective retry, then a safe fallback after two failures
-- **Human-in-the-loop clarification, bounded**: an ambiguous query pauses the graph (a LangGraph interrupt) and asks the user to disambiguate. One clarification per conversation — if the agent tries to ask a second time, `_force_search` calls `hybrid_search_papers` directly on the original query instead of stalling
-- **Semantic caching**: an answer is cached only when it is marked reliable and needed zero retries, keyed to a fingerprint of the current paper library, so the cache invalidates itself the moment the library changes
+- **Human-in-the-loop clarification, bounded and grounded**: an ambiguous query pauses the graph (a LangGraph interrupt) and asks the user to disambiguate. The agent supplies only the question — the options it offers are built by the graph from real `hybrid_search_papers` results, so it cannot invent a paper title to put in front of the user. One clarification per conversation; if the agent tries to ask again, `_force_search` runs the search itself rather than stalling
+- **Semantic caching, gated per turn**: an answer is cached only if `extract_info` actually ran on this turn's search results and the turn needed zero retries. `answer_is_reliable` is recomputed every turn rather than carried forward, so an answer written from conversation history alone never reaches the cache. Entries are keyed to a fingerprint of the current paper library and invalidate when it changes
 - **Session-scoped agent context**: the LLM only sees the current turn's messages (`_current_turn_messages`), not the full cross-session history a Postgres checkpointer would otherwise replay into it
 - **In-process MCP**: the FastMCP tool server is mounted inside the FastAPI app at `/mcp`, so the agent's tool calls stay on loopback instead of crossing a network boundary between two services
 
@@ -69,8 +69,8 @@ The graph has six nodes: `check_cache`, `run_agent`, `clarify`, `check_citations
 ### Run locally
 
 ```bash
-git clone https://github.com/AnuradhaBhanout/RAGchatbot.git
-cd RAGchatbot
+git clone https://github.com/AnuradhaBhanout/Footnote.git
+cd Footnote
 uv pip install -e .
 ```
 
@@ -202,13 +202,15 @@ pip install -r requirements.txt && python -c "from fastembed import TextEmbeddin
 uvicorn api.api:app --host 0.0.0.0 --port $PORT --workers 1
 ```
 
+`--workers 1` is not optional. `HybridIndex` and `SemanticCache` are process-global singletons, so a second worker means a second copy of the index in memory and no shared in-process state.
+
 **Environment**
 
 `DATABASE_URL`, `CEREBRAS_API_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST`, plus:
 
 | Variable | Why |
 |---|---|
-| `FASTEMBED_CACHE_PATH` | fastembed defaults to `/tmp`, which does not survive a restart, so the model would be re-downloaded on every cold start. Point it inside the project directory and the build-step prefetch above bakes it into the image |
+| `FASTEMBED_CACHE_PATH` | fastembed defaults to `/tmp`, which does not survive a restart, so the model would be re-downloaded on every cold start. Pointing it inside the project directory lets the build-step prefetch above bake the model (~180 MB) into the image instead |
 
 Deployed on Render's free tier, which spins down after roughly 15 minutes idle. The first request after that incurs a cold start while the container boots and the ONNX model loads from disk. Production would run on always-on compute.
 
@@ -238,7 +240,6 @@ cd src && pytest
 Stated rather than hidden, because they shape what the system can and can't do:
 
 - **No offline retrieval eval.** Quality is observed through Langfuse scores (`cache_hit`, `citation_pass_rate`) in production. There is no frozen query set with expected paper IDs, so a retrieval change cannot be regressed against a number.
-- **Clarification options aren't verified.** `ask_clarification` arguments are model-generated and don't pass through `citation_verifier`, so the options it offers can name papers that aren't in the library.
 - **No rate limiting.** Under concurrent load, a 429 from the LLM provider degrades to a fallback answer rather than being queued or retried with backoff.
 - **CORS is open.** `allow_origins=["*"]` in `api/api.py` should be narrowed to the frontend's domain.
 
