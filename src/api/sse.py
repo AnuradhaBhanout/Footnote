@@ -92,7 +92,7 @@ async def stream_graph_events(chatbot, graph_input, session_id: str, tags: list[
             original_query = state.values.get("original_query","")
             retries = state.values.get("search_retries",0) + state.values.get("citation_retries",0)
 
-            if answer and retries == 0 and answer_is_reliable:
+            if answer and retries == 0 and answer_is_reliable and not state.values.get("cache_hit"):
                 try:
                     await chatbot.acquire_agent()
                     try:
