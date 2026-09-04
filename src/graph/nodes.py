@@ -57,6 +57,7 @@ class GraphNodes:
                          "draft_answer": result["answer"],
                          "fetched_papers": result.get("fetched_papers", []),
                          "citation_check_passed": True,
+                         "answer_is_reliable": True,
                          }
         except (anyio.ClosedResourceError, McpError):
             for attempt in range(2):
