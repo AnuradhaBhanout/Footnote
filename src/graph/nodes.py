@@ -72,7 +72,8 @@ class GraphNodes:
                             "cache_hit":True,
                             "draft_answer":result["answer"],
                             "fetched_papers":result.get("fetched_papers",[]),
-                            "citation_check_passed":True
+                            "citation_check_passed":True,
+                            "answer_is_reliable": True,
                         }
                     break
                 except (anyio.ClosedResourceError,McpError):
