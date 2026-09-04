@@ -207,7 +207,7 @@ class HybridIndex:
             rows = cur.fetchall()
 
         put_conn(conn)
-        texts = [paper_to_text({"title":r[1],"summary":r[4]}) for r in rows]
+        texts = [paper_to_text({"title":r[1],"summary":r[3]}) for r in rows]
         titles = [r[1] for r in rows]
         ids = [r[0] for r in rows]
 
