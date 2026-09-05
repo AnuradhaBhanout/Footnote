@@ -47,15 +47,14 @@ def run_eval(index: HybridIndex, queries: list[dict], k: int = 5, alpha: float =
         }
     
 
+def sweep(index, queries, alphas=(0.0, 0.25, 0.5, 0.75, 1.0)):
+    for alpha in alphas:
+        result = run_eval(index, queries, alpha=alpha)
+        print(f"alpha={alpha}  recall@5 {result['recall_at_k']:.3f}  MRR {result['mrr']:.3f}")
 
 
-
-
-if __name__ == "__main__":
-    index = HybridIndex()
-    index.load_cache_or_build()
-    queries = [json.loads(l) for l in open(QUERIES,encoding="utf-8") if l.strip()]
-    result = run_eval(index, queries)
+def report(index, queries, alpha=0.5):
+    result = run_eval(index, queries,alpha=alpha)
     print(f"recall@5 {result['recall_at_k']:.3f}   MRR {result['mrr']:.3f}   n={result['n']}\n")
     for r in result["per_query"]:
         flag = "  <-- " if r["rr"] < 1.0 else "       "
@@ -63,6 +62,15 @@ if __name__ == "__main__":
         if r["rr"] < 1.0:
             print(f"         expected {r['expected']}")
             print(f"         got      {r['ranked']}")
+
+
+
+if __name__ == "__main__":
+    index = HybridIndex()
+    index.load_cache_or_build()
+    queries = [json.loads(l) for l in open(QUERIES,encoding="utf-8") if l.strip()]
+    report(index,queries)
+    sweep(index, queries)
 
 
 
