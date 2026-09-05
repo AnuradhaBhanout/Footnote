@@ -1,0 +1,8 @@
+
+  {"query": "how do I backtest an RL trading agent without building the env myself", "expected_paper_id": "2111.09395v1"}
+  {"query": "what deep learning approaches have been tried for segmenting anatomy in medical scans", "expected_paper_id": "1803.08691v1"}
+  {"query": "which framework lets me train a trading agent across multiple GPUs without rewriting the pipeline", "expected_paper_id": "2111.05188v1"}
+  {"query": "which model tackle the data heterogeneity issue occurs during medical image segmentation", "expected_paper_id": "2204.08467v2"}
+  {"query": "which NLP Processing Studies shows notable obstacles when transferring from English-centric architectures to Turkish language", "expected_paper_id": "2101.11436v1"}
+  {"query": "is there an open source library for tokenizing and tagging Thai text in python", "expected_paper_id": "2312.04649v1"}
+
