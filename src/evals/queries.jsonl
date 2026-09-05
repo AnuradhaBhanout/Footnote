@@ -4,4 +4,5 @@
 {"query": "which model tackle the data heterogeneity issue occurs during medical image segmentation", "expected_paper_id": "2204.08467v2"}
 {"query": "which NLP Processing Studies shows notable obstacles when transferring from English-centric architectures to Turkish language", "expected_paper_id": "2101.11436v1"}
 {"query": "is there an open source library for tokenizing and tagging Thai text in python", "expected_paper_id": "2312.04649v1"}
+{"query": "which deep learning framework do I need to automated stock trading", "expected_paper_id": "2111.09395v1"}
 
