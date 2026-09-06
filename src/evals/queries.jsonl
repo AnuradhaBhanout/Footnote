@@ -3,6 +3,21 @@
 {"query": "which framework lets me train a trading agent across multiple GPUs without rewriting the pipeline", "expected_paper_id": "2111.05188v1"}
 {"query": "which model tackle the data heterogeneity issue occurs during medical image segmentation", "expected_paper_id": "2204.08467v2"}
 {"query": "which NLP Processing Studies shows notable obstacles when transferring from English-centric architectures to Turkish language", "expected_paper_id": "2101.11436v1"}
+
 {"query": "is there an open source library for tokenizing and tagging Thai text in python", "expected_paper_id": "2312.04649v1"}
 {"query": "what covers the whole workflow from market data ingestion through to evaluating a trained trading policy", "expected_paper_id": "2111.09395v1"}
+{"query": "why is it so hard to get reliable emotion labels from heart rate and skin sensors", "expected_paper_id": "2406.14908v1"}
+{"query":" which open-source PyTorch library is use to analyze robustness in deep learning models", "expected_paper_id":"2005.06149v1"}
+{"query":" is there an affordable physical robot I can use to test RL algorithms outside a simulator", "expected_paper_id":"2607.18488v1"}
 
+{"query":"how do I test whether my RAG system's citations are actually supported","expected_paper_id":"2502.10881v1"}
+{"query":"which framework aims to improve model robustness and accuracy by augmentations to  bridge gaps in data processing during inference rather than retraining","expected_paper_id":"2606.10410v2"}
+{"query":"which paper investigates how structured prompt can guide Large Language Models to produce more accurate results", "expected_paper_id":"2507.03405v1"}
+{"query":"Describe an architecture that matches transformers on string copying without attention", "expected_paper_id":"2406.16168v1"}
+{"query":"Is there a web tool designed to formatting software citations much easier for researchers", "expected_paper_id":"2406.04405v2"}
+
+{"query":"which NLP paper compares the performance on character-level tasks against token-level tasks of the model", "expected_paper_id":"2405.11357v3"}
+{"query":"when during training does a model start memorising facts and when does it begin making them up","expected_paper_id":"2503.21676v2"}
+{"query":"how do you make a chatbot use emotional intelligence and psychological principles to improve conversational coherence in LLMs?", "expected_paper_id":"2501.05032v2"}
+{"query":"can buildings themselves store heat to let a combined heat and power plant absorb more wind and solar", "expected_paper_id":"2001.10371v1"}
+{"query":"how can I turn doctors notes into structured fields I can actually query for a study", "expected_paper_id":"2110.10780v3"}
