@@ -127,3 +127,13 @@ async def health(request: Request):
         except Exception:
             db_ok = False
     return {"status": "ok", "ready": chatbot is not None and chatbot.ready_event.is_set(), "db": db_ok}
+
+
+
+@app.get("/whoami")
+async def whoami(request: Request):
+    return {
+        "client_host": request.client.host,
+        "x_forwarded_for": request.headers.get("x-forwarded-for"),
+        "x_real_ip": request.headers.get("x-real-ip"),
+    }
