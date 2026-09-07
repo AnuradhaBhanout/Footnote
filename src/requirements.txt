@@ -456,3 +456,4 @@ xxhash==3.8.0
     #   langsmith
 zstandard==0.25.0
     # via langsmith
+slowapi>=0.1.10
