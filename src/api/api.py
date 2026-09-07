@@ -80,7 +80,7 @@ async def chat(request: ChatRequest ,chatbot: MCP_ChatBot = Depends(get_chatbot)
     "streaming through Langgraph"
 
     
-    session_id = request.session_id or str(uuid.uuid4())
+    session_id = str(request.session_id) if request.session_id else str(uuid.uuid4())
    
     graph_input ={
                 "original_query": request.query,
@@ -102,12 +102,13 @@ async def chat(request: ChatRequest ,chatbot: MCP_ChatBot = Depends(get_chatbot)
 
 @app.post("/resume")
 async def resume(request: ResumeRequest,chatbot:MCP_ChatBot = Depends(get_chatbot)):
-    state = await chatbot.app.aget_state({"configurable": {"thread_id": request.session_id}})
+    session_id = str(request.session_id)
+    state = await chatbot.app.aget_state({"configurable": {"thread_id":session_id}})
     if not state.next:
         raise HTTPException(404, "No paused session with that id")
    
     return StreamingResponse(
-        stream_graph_events(chatbot,Command(resume=request.answer),request.session_id,tags=["resume"]),
+        stream_graph_events(chatbot,Command(resume=request.answer),session_id,tags=["resume"]),
         media_type="text/event-stream",
         headers=_sse_HEADERS,
     )
