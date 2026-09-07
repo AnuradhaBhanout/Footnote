@@ -16,7 +16,12 @@ from client.mcp_v1_chatBot import MCP_ChatBot
 from log_setup import setup_logging
 from db.db import init_db
 from server.mcp_app import mcp
-from server import tools 
+
+
+from slowapi import Limiter,_rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
 
  
 load_dotenv(find_dotenv())
@@ -54,6 +59,11 @@ async def lifespan(app: FastAPI):
 #APP
 app = FastAPI(title="RAGchatbot API", version="1.0.0",lifespan=lifespan)
 
+
+limiter = Limiter(key_func= get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded,_rate_limit_exceeded_handler)
+
 # a security filter that intercepts incoming requests before they reach your endpoints
 ALLOWED_ORIGINS=os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
 app.add_middleware(
@@ -76,7 +86,8 @@ _sse_HEADERS = {
 
 
 @app.post("/chat")
-async def chat(request: ChatRequest ,chatbot: MCP_ChatBot = Depends(get_chatbot)):  
+@limiter.limit("10/minute")
+async def chat(request: Request, body: ChatRequest, chatbot: MCP_ChatBot = Depends(get_chatbot)):  
     "streaming through Langgraph"
 
     
