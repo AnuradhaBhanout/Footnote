@@ -6,5 +6,5 @@ class ChatRequest(BaseModel):
     session_id: uuid.UUID | None = None
 
 class ResumeRequest(BaseModel):
-    session_id: uuid.UUID=Field(max_length=64)
+    session_id: uuid.UUID
     answer: str = Field(min_length=1,max_length=500)
