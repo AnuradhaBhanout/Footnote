@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from contextlib import asynccontextmanager
-
+import os
 
 from dotenv import load_dotenv,find_dotenv
 from fastapi import FastAPI,HTTPException,Depends,Request
@@ -55,11 +55,12 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="RAGchatbot API", version="1.0.0",lifespan=lifespan)
 
 # a security filter that intercepts incoming requests before they reach your endpoints
+ALLOWED_ORIGINS=os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # will tighten in production
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=ALLOWED_ORIGINS, 
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 
 )
 
