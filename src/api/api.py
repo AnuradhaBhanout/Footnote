@@ -16,7 +16,7 @@ from client.mcp_v1_chatBot import MCP_ChatBot
 from log_setup import setup_logging
 from db.db import init_db
 from server.mcp_app import mcp
-
+import server.tools
 
 from slowapi import Limiter,_rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
