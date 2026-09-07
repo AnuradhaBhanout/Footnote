@@ -36,4 +36,5 @@ dependencies = [
    "psycopg-pool>=3.3.1",
    "langfuse>=4.14.0",
    "slowapi>=0.1.10",
+   
 ]
