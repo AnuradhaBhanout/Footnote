@@ -91,11 +91,11 @@ async def chat(request: Request, body: ChatRequest, chatbot: MCP_ChatBot = Depen
     "streaming through Langgraph"
 
     
-    session_id = str(request.session_id) if request.session_id else str(uuid.uuid4())
+    session_id = str(body.session_id) if body.session_id else str(uuid.uuid4())
    
     graph_input ={
-                "original_query": request.query,
-                "current_query": request.query,
+                "original_query": body.query,
+                "current_query": body.query,
                 "messages": [],
                 "search_retries":0,
                 "citation_retries":0,
@@ -112,14 +112,15 @@ async def chat(request: Request, body: ChatRequest, chatbot: MCP_ChatBot = Depen
 
 
 @app.post("/resume")
-async def resume(request: ResumeRequest,chatbot:MCP_ChatBot = Depends(get_chatbot)):
-    session_id = str(request.session_id)
+@limiter.limit("10/minute")
+async def resume(request:Request, body: ResumeRequest,chatbot:MCP_ChatBot = Depends(get_chatbot)):
+    session_id = str(body.session_id)
     state = await chatbot.app.aget_state({"configurable": {"thread_id":session_id}})
     if not state.next:
         raise HTTPException(404, "No paused session with that id")
    
     return StreamingResponse(
-        stream_graph_events(chatbot,Command(resume=request.answer),session_id,tags=["resume"]),
+        stream_graph_events(chatbot,Command(resume=body.answer),session_id,tags=["resume"]),
         media_type="text/event-stream",
         headers=_sse_HEADERS,
     )
