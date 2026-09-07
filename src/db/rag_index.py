@@ -1,6 +1,4 @@
-import os
-import json
-#import pickle
+
 import numpy as np
 from rank_bm25 import BM25Okapi
 from db.paper_store import load_all_papers,get_papers_fingerprint
