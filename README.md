@@ -139,6 +139,9 @@ src/
 │   ├── paper_store.py          # load_all_papers, corpus fingerprint
 │   ├── semantic_cache.py       # Postgres-backed answer cache, SIMILARITY_THRESHOLD
 │   └── citation_verifier.py    # matches cited IDs/titles against real tool output
+├── evals/
+│   ├── queries.jsonl           # frozen 20-query known-item eval set
+│   └── run_eval.py             # recall@5 / MRR, alpha sweep
 ├── run_dev.py                  # Windows-only local launcher (selector event loop)
 └── tests/                      # pytest suite
 ```
@@ -233,15 +236,38 @@ uv pip install -e .
 cd src && pytest
 ```
 
-24 tests across three files: `hybrid_search_papers` behaviour including the quoted-title guard, `search_papers` relevance filtering, and the agent's five-branch exception-recovery cascade in `_invoke_agent_with_recovery`.
+44 tests across six files: `hybrid_search_papers` behaviour including the quoted-title guard, `search_papers` relevance filtering, the agent's five-branch exception-recovery cascade in `_invoke_agent_with_recovery`, every conditional edge in `graph/routing.py` (both sides of the retry cap and the clarification cap), a regression test pinning `embed_specific` to the summary column, and the retrieval metric functions.
+
+## Retrieval evaluation
+
+A frozen query set lives at `src/evals/queries.jsonl`: 20 natural-language queries, each labelled with the one paper in the corpus that answers it. `src/evals/run_eval.py` runs them through `HybridIndex.search` and reports recall@5 and MRR, plus a per-query breakdown showing where the correct paper ranked and what outranked it.
+
+```bash
+cd src && uv run python evals/run_eval.py
+```
+
+Alpha sweep over the same loaded index (`alpha=0.0` is BM25 only, `1.0` is dense only):
+
+| alpha | 0.0 | 0.25 | 0.5 | 0.75 | 1.0 |
+|---|---|---|---|---|---|
+| recall@5 | 0.850 | 0.950 | **1.000** | **1.000** | 0.950 |
+| MRR | 0.677 | 0.756 | **0.883** | 0.852 | 0.842 |
+
+Hybrid beats either component alone, which is the justification for `alpha=0.5` in `hybrid_search_papers`. BM25 alone is clearly worst (-0.21 MRR); dense alone drops one paper out of the top 5 entirely.
+
+Four queries rank the correct paper below position 1, all beaten by topically adjacent papers in the same corpus: two FinRL variants competing with each other, a citation-faithfulness query outranked by other RAG papers, and a clinical-NLP query outranked by an adjacent EHR paper. These are recorded rather than tuned away.
+
+**What this measures, and what it does not.** Known-item retrieval only: one correct paper per query, and that paper is known to be in the index. It cannot score broad topical queries ("what's new in RAG"), bare acronyms that should trigger the `clarify` node, or requests for papers absent from the corpus. Those need a differently-labelled set.
+
+Caveats worth stating plainly. n=20 is small enough that one query moving is 0.05 recall, so the ordering among alpha 0.5/0.75/1.0 is within noise — the reliable finding is the gap to BM25-only. Some queries were drafted with model assistance from the same abstracts the index is built on, which biases toward easier retrieval. Queries phrased close to abstract wording measurably inflate the BM25-only column: reverting one such query dropped that column by 0.04 MRR with no code change. The set is therefore written in user phrasing and frozen — it changes when a label is wrong, never because retrieval failed.
 
 ## Known limitations
 
 Stated rather than hidden, because they shape what the system can and can't do:
 
-- **No offline retrieval eval.** Quality is observed through Langfuse scores (`cache_hit`, `citation_pass_rate`) in production. There is no frozen query set with expected paper IDs, so a retrieval change cannot be regressed against a number.
+- **Retrieval eval is known-item only.** The 20-query set at `src/evals/` measures whether a known paper ranks in the top 5. There is no set-valued labelling for topical queries, no corpus-coverage measure, and no eval for the clarification path. Production quality is still observed through Langfuse scores (`cache_hit`, `citation_pass_rate`).
 - **No rate limiting.** Under concurrent load, a 429 from the LLM provider degrades to a fallback answer rather than being queued or retried with backoff.
-- **CORS is open.** `allow_origins=["*"]` in `api/api.py` should be narrowed to the frontend's domain.
+- **CORS is narrowed, but it protects the user, not the API.** `allow_origins` now reads from `ALLOWED_ORIGINS` (`api/api.py`), defaulting to localhost. Worth being precise about what that buys: CORS is enforced by the browser, so it does nothing against scripted abuse, and with no sessions or auth there is no credential to hijack. The real exposure is quota theft — someone pointing their own frontend at this backend — and the control for that is rate limiting, not CORS. The allowlist is set because it costs one line and is a precondition for adding auth later.
 
 ## License
 
