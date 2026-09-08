@@ -109,7 +109,7 @@ class GraphNodes:
         ]
 
         return {
-            **state, 
+            
             "messages": updated_messages,
             "current_query": f"{state['original_query']} — user clarified: {human_answer}",
             "clarification_question": None, 
@@ -126,7 +126,7 @@ class GraphNodes:
 
     async def run_agent(self, state: GraphState, config: RunnableConfig) -> GraphState:
         logger.info(f"--- NODE START: run_agent with query: {state['current_query']} ---")
-        state = {**state, "fetched_papers": state.get("fetched_papers", [])}
+        state = {"fetched_papers": state.get("fetched_papers", [])}
         try:
             messages = self._prepare_agent_messages(state)
             
@@ -138,7 +138,7 @@ class GraphNodes:
         except Exception as e:
             logger.error(f"run_agent: unhandled exception: {type(e).__name__}: {e}", exc_info=True)
             return {
-                **state,
+                
                 "draft_answer": "I ran into an unexpected issue processing that — please try again.",
                 "search_retries": state["search_retries"] + 1,
                 "answer_is_reliable": False,
@@ -183,7 +183,7 @@ class GraphNodes:
         except GraphRecursionError:
             logger.error("run_agent: hit internal recursion limit — agent looped without converging")
             return None,{
-                **state,
+                
                 "draft_answer": "I couldn't find anything matching that after several attempts — could you try a different phrasing or a known paper title?",
                 "search_retries": state["search_retries"] + 1,
                 "answer_is_reliable": False,
@@ -203,7 +203,7 @@ class GraphNodes:
                     if attempt == 1:
                         logger.error(f"run_agent: reconnect retries exhausted: {e}")
                         return None,{
-                            **state,
+                            
                             "draft_answer": "The research service is temporarily unavailable — please try again in a moment.",
                             "search_retries": state["search_retries"] + 1,
                             "answer_is_reliable": False, 
@@ -214,7 +214,7 @@ class GraphNodes:
                 agent_state = await call_agent(10)  #25
             except Exception as e2:
                 logger.error(f"run_agent: retry after timeout also failed: {type(e2).__name__}: {e2}")
-                return None,{**state,
+                return None,{
                         "draft_answer": "The model took too long to respond — please try again.",
                         "search_retries": state["search_retries"] + 1,
                         "answer_is_reliable": False}
@@ -226,7 +226,7 @@ class GraphNodes:
                     agent_state = await call_agent(15)  #55
                 except Exception as e2:
                     logger.error(f"run_agent: retry also failed: {type(e2).__name__}: {e2}")
-                    return None,{**state,
+                    return None,{
                             "draft_answer": "I had trouble processing that — could you try rephrasing?", 
                             "search_retries": state["search_retries"] + 1,
                             "answer_is_reliable": False}
@@ -237,7 +237,7 @@ class GraphNodes:
             # catch-all: anything not matched above skipped straight to
             # agent_state["messages"] and crashed with UnboundLocalError
             logger.error(f"run_agent: unhandled exception from call_agent: {type(e).__name__}: {e}", exc_info=True)
-            return None,{**state,
+            return None,{
                     "draft_answer": "I ran into an unexpected issue processing that — please try again.",
                     "search_retries": state["search_retries"] + 1,
                     "answer_is_reliable": False}
@@ -275,7 +275,7 @@ class GraphNodes:
             logger.warning("--- RUN_AGENT: LLM returned empty content ---")
  
         return {
-            **state,
+            
             "messages": agent_messages,
             "draft_answer": draft,
             "clarification_question": None,
@@ -305,7 +305,7 @@ class GraphNodes:
         args = clarify_call.get("args", {})
         logger.info(f"----RUN_AGENT: Agent requested clarification: {args.get('question')}")
         return {
-            **state,
+            
             "messages": agent_messages,
             "clarification_question": args.get("question", "Could you clarify?"),
             "clarification_options":  [],
@@ -463,7 +463,7 @@ class GraphNodes:
         result = verify_citations(state["draft_answer"],state["messages"],overlap_threshold=0.3)
         logger.info(f"--- CITATION CHECK: passed={result['passed']} issues={result['issues']}")
         get_client().score_current_trace(name="citation_pass_rate", value=1 if result["passed"] else 0, comment="; ".join(result["issues"]))
-        return {**state,"citation_check_passed":result["passed"], "citation_issues":result["issues"]}
+        return {"citation_check_passed":result["passed"], "citation_issues":result["issues"]}
 
 
     async def retry_with_feedback(self,state: GraphState) -> GraphState:
@@ -474,12 +474,12 @@ class GraphNodes:
             f"Use ONLY the exact paper_id/title pairs returned by the tools - do not"
             f"Invent or alter any title, author, or finding."
         )
-        return {**state,"current_query": corrective_query,"citation_retries": state["citation_retries"]+1}
+        return {"current_query": corrective_query,"citation_retries": state["citation_retries"]+1}
     
 
     def fallback(self,state: GraphState)->GraphState:
         return{
-            **state,
+            
             "draft_answer": "I don't have enough verified information to answer that accurately"
             "from your saved papers. Could you rephrase, or ask me to search again wit different terms?",
             "answer_is_reliable": False,
