@@ -20,9 +20,11 @@ def build_graph(llm, chatbot):
     graph.add_node("check_citations",nodes.check_citations)
     graph.add_node("retry_with_feedback",nodes.retry_with_feedback)
     graph.add_node("fallback",nodes.fallback)
+    graph.add_node("prune", nodes.prune)
 
 
-    graph.set_entry_point("check_cache")
+    graph.set_entry_point("prune")
+    graph.add_edge("prune", "check_cache")
     graph.add_conditional_edges("check_cache",after_cache,{
         "end":END,
         "triage_query": "run_agent"
