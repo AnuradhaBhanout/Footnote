@@ -10,7 +10,8 @@ def _count_tokens(messages) -> int:
     return sum(len(_ENC.encode(str(m.content))) for m in messages)
 
 import httpx
-from langchain_core.messages import HumanMessage, SystemMessage,AIMessage,ToolMessage,trim_messages
+from langchain_core.messages import HumanMessage, SystemMessage,AIMessage,ToolMessage,trim_messages,RemoveMessage
+
 from langchain_core.runnables import RunnableConfig
 
 from langfuse import get_client
@@ -23,7 +24,7 @@ from openai import APIError
 from client.mcp_content import parse_mcp_content
 from db.citation_verifier import verify_citations
 
-from graph.helpers import _collect_paper_ids_from_search, _parse_tool_result,_current_turn_messages
+from graph.helpers import _collect_paper_ids_from_search, _parse_tool_result,_current_turn_messages,stale_message_ids
 from graph.state import GraphState
 
 
@@ -34,6 +35,13 @@ class GraphNodes:
     def __init__(self,llm,chatbot):
         self.llm  = llm
         self.chatbot = chatbot
+
+    @staticmethod
+    def prune(state: GraphState) -> dict:
+        stale = stale_message_ids(state["messages"])
+        logger.info(f"--- NODE prune: removing {len(stale)} of {len(state['messages'])} messages ---")
+        return {"messages": [RemoveMessage(id=i) for i in stale]}
+
 
     async def check_cache(self,state: GraphState,config: RunnableConfig)-> GraphState:
         
