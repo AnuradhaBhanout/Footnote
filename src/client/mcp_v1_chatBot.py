@@ -182,7 +182,8 @@ class MCP_ChatBot:
                 print(f"Error {e}")
  
         except Exception as e:
-            print(f"failed to connect to {server_name}: {e}")
+            
+            logger.exception(f"failed to connect to {server_name}")
             raise
  
     async def _rebuild_agent(self):
