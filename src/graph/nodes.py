@@ -472,7 +472,8 @@ class GraphNodes:
     def check_citations(self,state: GraphState)-> GraphState:
         result = verify_citations(state["draft_answer"],state["messages"],overlap_threshold=0.3)
         logger.info(f"--- CITATION CHECK: passed={result['passed']} issues={result['issues']}")
-        get_client().score_current_trace(name="citation_pass_rate", value=1 if result["passed"] else 0, comment="; ".join(result["issues"]))
+        if bool(result.get("verified")):
+           get_client().score_current_trace(name="citation_pass_rate", value=1 if result["passed"] else 0, comment="; ".join(result["issues"]))
         return {"citation_check_passed":result["passed"], "citation_issues":result["issues"]}
 
 
