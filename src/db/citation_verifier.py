@@ -108,7 +108,7 @@ def verify_citations(answer_text:str,messages:list,overlap_threshold: float = 0.
     cited_ids = {_strip_version(pid) for pid in ARXIV_ID_PATTERN.findall(answer_text)}
 
     if not cited_ids:
-        return {"passed":True,"issues": []}
+        return {"passed":True,"issues": [],"verified":False}
     
     issues = []
     for paper_id in cited_ids:
@@ -124,4 +124,4 @@ def verify_citations(answer_text:str,messages:list,overlap_threshold: float = 0.
             f"barely appears in the answer (overlap={overlap: .2f}) - title/findings may be invented."
             )
 
-    return{"passed": len(issues) == 0, "issues":issues}
+    return{"passed": len(issues) == 0, "issues":issues,"verified":True}
