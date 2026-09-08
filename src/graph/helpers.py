@@ -77,7 +77,7 @@ def stale_message_ids(messages: list, keep_turns: int = 6) -> list[str]:
 
     stale = []
     for m in messages:
-        if isinstance(m, ToolMessage) or isinstance(m, AIMessage) and getattr(m,"tool_calls",None):
+        if (isinstance(m, ToolMessage) or isinstance(m, AIMessage) and getattr(m,"tool_calls",None)):
             stale.append(m.id)
     human_idxs = [i for i, m in enumerate(messages) if isinstance(m, HumanMessage)]
     cutoff = human_idxs[-keep_turns] if len(human_idxs) > keep_turns else 0
