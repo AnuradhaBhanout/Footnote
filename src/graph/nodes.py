@@ -157,17 +157,19 @@ class GraphNodes:
 
     @staticmethod
     def _prepare_agent_messages(state: GraphState) -> list:
-            messages =  _current_turn_messages(state["messages"])
+            messages =  list(state["messages"])
 
             if not messages or messages[-1].content != state["current_query"]:
                 messages = messages + [HumanMessage(content=state["current_query"])]
 
             messages = trim_messages(
                 messages,
+                start_on="human",
                 max_tokens=4000,
                 token_counter=_count_tokens,
                 strategy="last",
                 include_system=False,
+                end_on=("human","tool"),
             )
             return messages
 
