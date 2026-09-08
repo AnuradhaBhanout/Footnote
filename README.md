@@ -17,7 +17,8 @@ Built on LangGraph for orchestration, MCP for the tool layer, FastAPI/SSE for st
 
 ```mermaid
 flowchart TD
-    A["POST /chat (SSE)"] --> B["check_cache<br/>semantic match against previously<br/>verified answers for the current paper library"]
+    A["POST /chat (SSE)"] --> P["prune<br/>drops tool traffic and turns older than<br/>the last 6 from the checkpointed history"]
+    P --> B["check_cache<br/>semantic match against previously<br/>verified answers for the current paper library"]
     B -- hit --> C[return cached answer]
     B -- miss --> D["run_agent<br/>LangChain agent, tools: hybrid_search_papers,<br/>search_papers, ask_clarification"]
     D -- "ambiguous, first time" --> E["clarify<br/>interrupt, waits for user answer"]
@@ -34,16 +35,19 @@ flowchart TD
 
 `hybrid_search_papers` combines BM25 and dense embeddings (`fastembed`) over the indexed library, then a separate LLM call judges whether any result actually answers the query, not just shares words with it. Only when that comes back empty does the agent fall back to a live arXiv search.
 
-The graph has six nodes: `check_cache`, `run_agent`, `clarify`, `check_citations`, `retry_with_feedback`, `fallback`. Caching a verified answer happens in the SSE layer after the graph finishes, not in a graph node.
+The graph has seven nodes: `prune`, `check_cache`, `run_agent`, `clarify`, `check_citations`, `retry_with_feedback`, `fallback`. Caching a verified answer happens in the SSE layer after the graph finishes, not in a graph node.
+
+`prune` runs at the entry point rather than the exit deliberately. At entry, the state holds only previous turns — the request supplies an empty `messages` list — so nothing the current turn needs can be destroyed. At exit there are three separate paths to `END`, and pruning on any of them would delete the tool output `check_citations` verifies against.
 
 ## Features
 
 - **Hybrid retrieval with an LLM relevance judge**: BM25 + dense embeddings narrow the candidates, then a strict judge model decides if any of them is actually relevant before the agent is allowed to use them
 - **Deterministic citation extraction**: the graph batches exactly one `extract_info` call itself once search settles on paper IDs, instead of leaving the model to decide how many times to fetch details
-- **Post-hoc citation verification**: every paper ID and title an answer cites is checked against real tool output; a fabricated or mismatched citation triggers a corrective retry, then a safe fallback after two failures
+- **Post-hoc citation verification**: every paper ID and title an answer cites is checked against real tool output; a fabricated or mismatched citation triggers a corrective retry, then a safe fallback after two failures. The check reports separately on whether anything was verified, so turns with nothing to check never inflate the pass rate
 - **Human-in-the-loop clarification, bounded and grounded**: an ambiguous query pauses the graph (a LangGraph interrupt) and asks the user to disambiguate. The agent supplies only the question — the options it offers are built by the graph from real `hybrid_search_papers` results, so it cannot invent a paper title to put in front of the user. One clarification per conversation; if the agent tries to ask again, `_force_search` runs the search itself rather than stalling
 - **Semantic caching, gated per turn**: an answer is cached only if `extract_info` actually ran on this turn's search results and the turn needed zero retries. `answer_is_reliable` is recomputed every turn rather than carried forward, so an answer written from conversation history alone never reaches the cache. Entries are keyed to a fingerprint of the current paper library and invalidate when it changes
-- **Session-scoped agent context**: the LLM only sees the current turn's messages (`_current_turn_messages`), not the full cross-session history a Postgres checkpointer would otherwise replay into it
+- **Bounded conversation memory**: the agent sees prior turns, trimmed to a token budget on a boundary that never orphans a tool call. What it does *not* see is the raw transcript — `prune` strips tool payloads and intermediate tool-calling messages from the checkpoint before each turn begins, so history is carried as questions and answers rather than as megabytes of search results. See [Conversation memory and state growth](#conversation-memory-and-state-growth)
+- **Per-IP rate limiting**: `slowapi` at 10 requests/minute on `/chat` and `/resume`, returning a 429 the frontend renders as a normal message rather than a stack trace
 - **In-process MCP**: the FastMCP tool server is mounted inside the FastAPI app at `/mcp`, so the agent's tool calls stay on loopback instead of crossing a network boundary between two services
 
 ## Tech stack
@@ -57,6 +61,7 @@ The graph has six nodes: `check_cache`, `run_agent`, `clarify`, `check_citations
 | Retrieval | BM25 (`rank-bm25`) + dense embeddings (`fastembed`, ONNX) |
 | Storage | PostgreSQL + `pgvector` (Neon) |
 | LLM | Cerebras `gpt-oss-120b`, used for both the agent and the relevance judge |
+| Rate limiting | `slowapi`, 10 req/min per IP |
 | Tracing | Langfuse |
 | Deployment | Render, single web service |
 
@@ -122,11 +127,12 @@ src/
 │   └── mcp_content.py          # normalizes MCP's content-block shapes to plain dicts
 ├── graph/
 │   ├── graph_pipeline.py       # wiring only, builds the StateGraph
-│   ├── nodes.py                # check_cache, run_agent, clarify, check_citations,
+│   ├── nodes.py                # prune, check_cache, run_agent, clarify, check_citations,
 │   │                           #   retry_with_feedback, fallback, _force_search
 │   ├── routing.py              # conditional edges: retry / clarify / fallback logic
 │   ├── state.py                # GraphState TypedDict
-│   └── helpers.py              # _current_turn_messages, paper-id collection, SCORE_FLOOR
+│   └── helpers.py              # stale_message_ids, _current_turn_messages,
+│                               #   paper-id collection, SCORE_FLOOR
 ├── server/
 │   ├── mcp_app.py              # shared FastMCP instance, /health route
 │   ├── tools.py                # hybrid_search_papers, search_papers, extract_info, cache tools
@@ -189,6 +195,35 @@ Answers a pending clarification for a session that's paused on one. Returns 404 
 
 An answer that cites nothing passes this check by construction — there is nothing to verify. Verification tells you the cited papers are real and were returned by a tool. It does not tell you they answer the question.
 
+So the check returns three keys, not two. `passed` says no citation failed; `verified` says there was something to check in the first place. A memory-derived answer that cites nothing comes back `passed: True, verified: False`, and `check_citations` only reports `citation_pass_rate` to Langfuse when `verified` is true — verification and non-verification are never averaged into the same number.
+
+That distinction became load-bearing when the agent gained conversation memory. Before, near enough every turn ran a search, so "cites nothing" was rare; now a follow-up can be answered from history, and without the flag the score would climb as verification coverage fell.
+
+## Conversation memory and state growth
+
+`GraphState.messages` uses LangGraph's `add_messages` reducer, checkpointed to Postgres per thread. The reducer appends; nothing in the original design ever removed. Combined with a browser session ID that never rotated, one thread reached 226 messages spanning 45 unrelated questions — roughly 400 KB of state loaded, merged through every node, serialized into every trace, and written back on every turn.
+
+No error, no failure — it surfaced from a Langfuse trace for a cache hit: 1.5 seconds of work, 6,000 lines of serialized state. Three causes, fixed separately:
+
+| Cause | Effect | Fix |
+|---|---|---|
+| Nodes returned `{**state, ...}` | Every node write touched the `messages` channel, versioning a fresh blob per super-step | Return only changed keys; LangGraph merges partial updates |
+| Nothing pruned the message list | Unbounded growth per thread | `prune` node + `stale_message_ids` |
+| Browser session ID never rotated | One thread accumulated across weeks | "New chat" rotates the ID client-side |
+
+`stale_message_ids` drops `ToolMessage`s and tool-calling `AIMessage`s — 97% of the payload — then anything older than `keep_turns` exchanges. Both kinds go together on purpose: an assistant message with `tool_calls` and no matching results is a provider 400.
+
+Consecutive checkpoint versions on a live thread, before and after the node was wired in:
+
+| checkpoint version | `messages` blob |
+|---|---|
+| …315 (before) | 409,798 bytes |
+| …316 (after) | 20,650 bytes |
+| …319 | 20,650 bytes |
+| …322 | 22,052 bytes |
+
+95% reduction, flat across subsequent turns. `stale_message_ids` is a pure function — no LLM, no database, no `self` — so both rules were written test-first.
+
 ## Deployment
 
 One Render web service.
@@ -228,6 +263,8 @@ There's no single config file; these live next to the code they govern.
 | `MAX_RETRIES` | `graph/routing.py` | 2 | citation-check and search-insufficiency retries before falling back |
 | clarification cap | `graph/routing.py`, `graph/nodes.py` | 1 | clarifications allowed per conversation before the graph forces a search |
 | `overlap_threshold` | `db/citation_verifier.py` | 0.3 (call site) | fraction of a cited paper's title that must appear in the answer text |
+| `keep_turns` | `graph/helpers.py` | 6 | exchanges of conversation history kept before older messages are pruned from the checkpoint |
+| `max_tokens` (trim) | `graph/nodes.py` | 4000 | token budget for the history window handed to the agent |
 
 ## Testing
 
@@ -236,7 +273,7 @@ uv pip install -e .
 cd src && pytest
 ```
 
-44 tests across six files: `hybrid_search_papers` behaviour including the quoted-title guard, `search_papers` relevance filtering, the agent's five-branch exception-recovery cascade in `_invoke_agent_with_recovery`, every conditional edge in `graph/routing.py` (both sides of the retry cap and the clarification cap), a regression test pinning `embed_specific` to the summary column, and the retrieval metric functions.
+Tests across eight files: `hybrid_search_papers` behaviour including the quoted-title guard, `search_papers` relevance filtering, the agent's five-branch exception-recovery cascade in `_invoke_agent_with_recovery`, every conditional edge in `graph/routing.py` (both sides of the retry cap and the clarification cap), a regression test pinning `embed_specific` to the summary column, the two pruning rules in `stale_message_ids`, both branches of the citation verifier's `verified` flag, and the retrieval metric functions.
 
 ## Retrieval evaluation
 
@@ -260,14 +297,6 @@ Four queries rank the correct paper below position 1, all beaten by topically ad
 **What this measures, and what it does not.** Known-item retrieval only: one correct paper per query, and that paper is known to be in the index. It cannot score broad topical queries ("what's new in RAG"), bare acronyms that should trigger the `clarify` node, or requests for papers absent from the corpus. Those need a differently-labelled set.
 
 Caveats worth stating plainly. n=20 is small enough that one query moving is 0.05 recall, so the ordering among alpha 0.5/0.75/1.0 is within noise — the reliable finding is the gap to BM25-only. Some queries were drafted with model assistance from the same abstracts the index is built on, which biases toward easier retrieval. Queries phrased close to abstract wording measurably inflate the BM25-only column: reverting one such query dropped that column by 0.04 MRR with no code change. The set is therefore written in user phrasing and frozen — it changes when a label is wrong, never because retrieval failed.
-
-## Known limitations
-
-Stated rather than hidden, because they shape what the system can and can't do:
-
-- **Retrieval eval is known-item only.** The 20-query set at `src/evals/` measures whether a known paper ranks in the top 5. There is no set-valued labelling for topical queries, no corpus-coverage measure, and no eval for the clarification path. Production quality is still observed through Langfuse scores (`cache_hit`, `citation_pass_rate`).
-- **No rate limiting.** Under concurrent load, a 429 from the LLM provider degrades to a fallback answer rather than being queued or retried with backoff.
-- **CORS is narrowed, but it protects the user, not the API.** `allow_origins` now reads from `ALLOWED_ORIGINS` (`api/api.py`), defaulting to localhost. Worth being precise about what that buys: CORS is enforced by the browser, so it does nothing against scripted abuse, and with no sessions or auth there is no credential to hijack. The real exposure is quota theft — someone pointing their own frontend at this backend — and the control for that is rate limiting, not CORS. The allowlist is set because it costs one line and is a precondition for adding auth later.
 
 ## License
 
