@@ -98,10 +98,15 @@ def _title_overlap_ratio(real_title: str,answer_text: str) -> float:
 
 def verify_citations(answer_text:str,messages:list,overlap_threshold: float = 0.4) -> dict:
     """
-    Returns {"passed": bool, "issues": [str, ...]}.
-    Fails if: a cited paper_id never appeared in any real tool result(fabricated ID),
-    or a cited paper_id's real title shares too little overlap with the answer text
-    (right ID, wrong/invented title or findings - the harder fabrication case).
+    Checks every arXiv ID in the answer against what the tools actually returned.
+
+    Two ways to fail: the ID was never in any tool result (made up outright), or
+    the ID is real but its actual title barely shows up in the answer — right
+    paper, invented findings, which is the harder one to catch.
+
+    Returns {"passed", "issues", "verified"}. "verified" is the one to watch:
+    an answer that cites nothing passes, because there was nothing to check.
+    That's not the same as being correct, so don't let it into your metrics.
     """
     real_papers = extract_real_papers_from_tool_results(messages)
     #cited_ids = set(ARXIV_ID_PATTERN.findall(answer_text))
