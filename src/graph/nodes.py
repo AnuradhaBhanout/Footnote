@@ -126,7 +126,7 @@ class GraphNodes:
 
     async def run_agent(self, state: GraphState, config: RunnableConfig) -> GraphState:
         logger.info(f"--- NODE START: run_agent with query: {state['current_query']} ---")
-        state = {"fetched_papers": state.get("fetched_papers", [])}
+        state = {**state,"fetched_papers": state.get("fetched_papers", [])}
         try:
             messages = self._prepare_agent_messages(state)
             
