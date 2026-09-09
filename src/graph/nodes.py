@@ -3,6 +3,8 @@ import logging
 import anyio
 import uuid
 import tiktoken
+import asyncio
+
 
 _ENC = tiktoken.get_encoding("cl100k_base")
 
@@ -367,7 +369,7 @@ class GraphNodes:
                             "plain-language summary now. Do not call any tools."
                         ),
                     ]
-                    final_response = await self.chatbot.llm.ainvoke(final_pass, config=config)
+                    final_response =  await asyncio.wait_for( self.chatbot.llm.ainvoke(final_pass, config=config),timeout=12)
  
                     agent_messages = agent_messages + [final_response]
                     extract_ran = True
