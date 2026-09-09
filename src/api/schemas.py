@@ -8,3 +8,8 @@ class ChatRequest(BaseModel):
 class ResumeRequest(BaseModel):
     session_id: uuid.UUID
     answer: str = Field(min_length=1,max_length=500)
+
+
+class FeedbackRequest(BaseModel):
+    trace_id: str
+    is_positive: bool
