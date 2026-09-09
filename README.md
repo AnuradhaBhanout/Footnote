@@ -47,7 +47,8 @@ The graph has seven nodes: `prune`, `check_cache`, `run_agent`, `clarify`, `chec
 - **Human-in-the-loop clarification, bounded and grounded**: an ambiguous query pauses the graph (a LangGraph interrupt) and asks the user to disambiguate. The agent supplies only the question — the options it offers are built by the graph from real `hybrid_search_papers` results, so it cannot invent a paper title to put in front of the user. One clarification per conversation; if the agent tries to ask again, `_force_search` runs the search itself rather than stalling
 - **Semantic caching, gated per turn**: an answer is cached only if `extract_info` actually ran on this turn's search results and the turn needed zero retries. `answer_is_reliable` is recomputed every turn rather than carried forward, so an answer written from conversation history alone never reaches the cache. Entries are keyed to a fingerprint of the current paper library and invalidate when it changes
 - **Bounded conversation memory**: the agent sees prior turns, trimmed to a token budget on a boundary that never orphans a tool call. What it does *not* see is the raw transcript — `prune` strips tool payloads and intermediate tool-calling messages from the checkpoint before each turn begins, so history is carried as questions and answers rather than as megabytes of search results. See [Conversation memory and state growth](#conversation-memory-and-state-growth)
-- **Per-IP rate limiting**: `slowapi` at 10 requests/minute on `/chat` and `/resume`, returning a 429 the frontend renders as a normal message rather than a stack trace
+- **Per-IP rate limiting**: `slowapi` at 10 requests/minute on `/chat`, `/resume` and `/feedback`, returning a 429 the frontend renders as a normal message rather than a stack trace
+- **Scored in production, not just traced**: three deterministic scores written from inside the graph (`cache_hit`, `error`, `citation_pass_rate`) plus a human `user_feedback` score from thumbs up/down in the UI — see [Observability and evaluation](#observability-and-evaluation)
 - **In-process MCP**: the FastMCP tool server is mounted inside the FastAPI app at `/mcp`, so the agent's tool calls stay on loopback instead of crossing a network boundary between two services
 
 ## Tech stack
@@ -116,7 +117,7 @@ Point the [frontend](https://github.com/AnuradhaBhanout/RAGchatbot-ui)'s `VITE_A
 ```
 src/
 ├── api/
-│   ├── api.py                  # FastAPI app: /chat, /resume, /health; mounts MCP at /mcp
+│   ├── api.py                  # FastAPI app: /chat, /resume, /feedback, /health; mounts MCP at /mcp
 │   ├── schemas.py              # ChatRequest, ResumeRequest
 │   ├── dependencies.py         # get_chatbot(), 503s until the graph is ready
 │   └── sse.py                  # SSE event loop; also stores verified answers in the cache
@@ -154,7 +155,7 @@ src/
 
 ## API
 
-Both endpoints stream Server-Sent Events; nothing here is a single JSON response.
+`/chat` and `/resume` stream Server-Sent Events; neither returns a single JSON response. All three POST routes are rate limited to 10 requests/minute per IP.
 
 ### `POST /chat`
 
@@ -180,6 +181,16 @@ Answers a pending clarification for a session that's paused on one. Returns 404 
 | `token` | `{content}` | the model streams a response token |
 | `done` | `{answer, session_id, cited_paper_ids, fetched_papers, trace_id}` | the graph finishes |
 | `error` | `{message}` | anything in the stream raised |
+
+### `POST /feedback`
+
+Attaches a human score to a completed trace. The `trace_id` comes from the `done` event of the turn being rated, so the vote lands on the same trace the answer was generated in.
+
+```json
+{ "trace_id": "e9282201edb8bc3efc02b2a5ce6582fd", "is_positive": true }
+```
+
+Scoring failures are caught and logged rather than raised — a Langfuse outage shouldn't turn a thumbs-up into a 500 for the user.
 
 ### `GET /health`
 
@@ -223,6 +234,27 @@ Consecutive checkpoint versions on a live thread, before and after the node was 
 | …322 | 22,052 bytes |
 
 95% reduction, flat across subsequent turns. `stale_message_ids` is a pure function — no LLM, no database, no `self` — so both rules were written test-first.
+
+## Observability and evaluation
+
+Tracing records what happened; scores record whether it was any good. Both are wired.
+
+**Tracing.** One span per request, opened in `api/sse.py` and propagated with the session ID, so turns group into Sessions rather than scattering. A LangChain `CallbackHandler` on the graph config captures every LLM and tool call underneath without a single instrumented node.
+
+**Online scores**, written per request against live traffic:
+
+| Score | Where | Value |
+|---|---|---|
+| `cache_hit` | `check_cache` | 1 on a semantic cache hit |
+| `error` | `run_agent` | 1 when the turn degraded to a fallback |
+| `citation_pass_rate` | `check_citations` | 1 when every citation verified — only written when there was something to verify |
+| `user_feedback` | `POST /feedback` | 1/0 from thumbs up/down in the UI |
+
+The first three are deterministic code evaluators, not sampled judges: every production request gets scored, and the rules are the same ones the graph routes on.
+
+**Offline eval.** `evals/run_eval.py` over a frozen 20-query set, on demand — see [Retrieval evaluation](#retrieval-evaluation).
+
+The gap worth naming: nothing yet judges whether a verified answer actually *answers* the question. `citation_pass_rate` proves the cited papers are real and were retrieved; relevance would need an LLM judge over a sample of traces.
 
 ## Deployment
 
