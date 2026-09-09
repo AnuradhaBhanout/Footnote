@@ -378,10 +378,15 @@ class GraphNodes:
                     # fall through — agent_messages keeps whatever the search-only agent already wrote
  
         if not extract_ran and searched:
-            # covers both "nothing found" and "extract_info call failed" —
-            # never let the search-agent's "gathering details" placeholder
-            # reach the user as a final answer
-            agent_messages = agent_messages + [self._no_results_fallback()]
+            if paper_ids:
+                #search worked :only the final  summary pass failed
+                agent_messages = agent_messages +[AIMessage(content=("I found the paper but coudnot generate the summary just now."
+                "Please try again in a moment."))]
+            else:
+                # covers both "nothing found" and "extract_info call failed" —
+                # never let the search-agent's "gathering details" placeholder
+                # reach the user as a final answer
+                agent_messages = agent_messages + [self._no_results_fallback()]
  
         return agent_messages, fetched_papers, extract_ran,searched
 
