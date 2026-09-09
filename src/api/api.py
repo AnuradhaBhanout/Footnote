@@ -8,9 +8,10 @@ from fastapi import FastAPI,HTTPException,Depends,Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from langgraph.types import Command
+from langfuse import get_client
 
 from api.dependencies import get_chatbot
-from api.schemas import ChatRequest,ResumeRequest
+from api.schemas import ChatRequest,ResumeRequest,FeedbackRequest
 from api.sse import stream_graph_events
 from client.mcp_v1_chatBot import MCP_ChatBot
 from log_setup import setup_logging
@@ -151,3 +152,11 @@ async def whoami(request: Request):
         "x_forwarded_for": request.headers.get("x-forwarded-for"),
         "x_real_ip": request.headers.get("x-real-ip"),
     }
+
+@app.post("/feedback")
+@limiter.limit("10/minute")
+async def feedback(request:Request, body: FeedbackRequest):
+    get_client().create_score(trace_id=body.trace_id,
+                              name="user_feedback",
+                              value=1 if body.is_positive else 0,)
+    return {"ok":True}
