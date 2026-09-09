@@ -380,8 +380,10 @@ class GraphNodes:
         if not extract_ran and searched:
             if paper_ids:
                 #search worked :only the final  summary pass failed
-                agent_messages = agent_messages +[AIMessage(content=("I found the paper but coudnot generate the summary just now."
-                "Please try again in a moment."))]
+                agent_messages = agent_messages + [AIMessage(content=(
+                    "I found the paper but couldn't generate the summary just now. "
+                    "Please try again in a moment."
+                ))]
             else:
                 # covers both "nothing found" and "extract_info call failed" —
                 # never let the search-agent's "gathering details" placeholder
