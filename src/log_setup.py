@@ -16,5 +16,6 @@ def setup_logging(name: str, filename: str)-> logging.Logger:
         stream_handler = logging.StreamHandler()
         stream_handler.setFormatter(fmt)
         logger.addHandler(stream_handler)
+        logging.getLogger("openai._base_client").setLevel(logging.INFO)
 
     return logger
