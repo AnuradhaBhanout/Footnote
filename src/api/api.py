@@ -156,7 +156,11 @@ async def whoami(request: Request):
 @app.post("/feedback")
 @limiter.limit("10/minute")
 async def feedback(request:Request, body: FeedbackRequest):
-    get_client().create_score(trace_id=body.trace_id,
+    try:
+     get_client().create_score(trace_id=body.trace_id,
                               name="user_feedback",
-                              value=1 if body.is_positive else 0,)
+                              value=1 if body.is_positive else 0)
+
+    except Exception as e:
+        logger.warning("feedback score failed",exc_info=True)
     return {"ok":True}
