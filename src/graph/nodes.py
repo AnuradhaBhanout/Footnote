@@ -6,9 +6,12 @@ import tiktoken
 import asyncio
 
 
-_ENC = tiktoken.get_encoding("cl100k_base")
+
 
 def _count_tokens(messages) -> int:
+    global _ENC
+    if _ENC is None:
+       _ENC = tiktoken.get_encoding("cl100k_base")
     return sum(len(_ENC.encode(str(m.content))) for m in messages)
 
 import httpx
