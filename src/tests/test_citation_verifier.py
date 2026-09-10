@@ -20,5 +20,5 @@ def test_real_citation_is_verified():
 
 def test_no_citations_is_not_verified():
     r = verify_citations("plain text with no ids", [])
-    assert r["passed"] is True
+    assert r["passed"] is False
     assert r["verified"] is False
