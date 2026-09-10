@@ -7,7 +7,7 @@ import asyncio
 
 
 
-
+_ENC = None
 def _count_tokens(messages) -> int:
     global _ENC
     if _ENC is None:
