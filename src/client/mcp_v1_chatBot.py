@@ -27,16 +27,12 @@ logger = setup_logging("RAG-Chatbot", "debug.log")
 _ = load_dotenv(find_dotenv())
  
 DATABASE_URL = os.getenv("DATABASE_URL")
- 
- 
-class MCP_ChatBot:
- 
-    def __init__(self):
-        self.sessions = {}
-        self.exit_stack = AsyncExitStack()
-        self.thread_id = str(uuid.uuid4())
- 
-        self.llm = ChatOpenAI(
+
+_mcp_client = None
+def get_mcp_client():
+    global _mcp_client
+    if _mcp_client is None:
+        _mcp_client =  ChatOpenAI(
             model="gpt-oss-120b",
             openai_api_base="https://api.cerebras.ai/v1",
             openai_api_key=os.getenv("CEREBRAS_API_KEY"),
@@ -45,7 +41,16 @@ class MCP_ChatBot:
             timeout=10,
             model_kwargs={"parallel_tool_calls": False, "reasoning_effort": "low"},
         )
+    return _mcp_client
+  
+class MCP_ChatBot:
  
+    def __init__(self):
+        self.sessions = {}
+        self.exit_stack = AsyncExitStack()
+        self.thread_id = str(uuid.uuid4())
+ 
+        
         self.available_tools = []
         self.available_prompts = []
  
@@ -191,14 +196,14 @@ class MCP_ChatBot:
         tool_names_str = ", ".join(t.name for t in search_tools)
  
         self.agent = create_agent(
-            model=self.llm,
+            model=get_mcp_client(),
             tools=search_tools + [ask_clarification],
             system_prompt=build_system_prompt(tool_names_str),
         )
  
     async def _build_agent_and_graph(self):
         await self._rebuild_agent()
- 
+        self.llm = get_mcp_client()
         graph = build_graph(self.llm, self)
  
         self._pg_pool = AsyncConnectionPool(
