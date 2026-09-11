@@ -42,7 +42,7 @@ def evaluate_relevance(query:str,results:list)->dict:
     Respond with ONLY this JSON, nothing else:
     {{"sufficient":true or false,"best_paper_id":"<id or null>","reason":"<one sentence>"}}
     """
-    response = get_evaluator_client.chat.completions.create(
+    response = get_evaluator_client().chat.completions.create(
         model=EVALUATOR_MODEL,
         messages=[{"role":"user","content":prompt}],
         max_tokens=300,
