@@ -48,3 +48,9 @@ jobs:
       env:
         DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
         OPENAI_API_KEY: sk-dummy-not-a-real-key
+ deploy:
+    needs: [test, install-from-pyproject,smoke]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -fsSL -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
