@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 import os
 
 from dotenv import load_dotenv,find_dotenv
-from fastapi import FastAPI,HTTPException,Depends,Request
+from fastapi import FastAPI,HTTPException,Depends,Request,Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from langgraph.types import Command
@@ -22,6 +22,7 @@ import server.tools
 from slowapi import Limiter,_rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from db.db import get_pool
 
 
  
@@ -131,27 +132,26 @@ async def resume(request:Request, body: ResumeRequest,chatbot:MCP_ChatBot = Depe
 
 
 @app.api_route("/health",methods=["GET","HEAD"])
-async def health(request: Request):
+async def health(request: Request, response: Response):
     chatbot = getattr(request.app.state,"chatbot",None)
     db_ok = False
-    if chatbot and hasattr(chatbot, "_pg_pool"):
+    try:
+        conn = get_pool().getconn()
         try:
-            async with chatbot._pg_pool.connection() as conn:
-                await conn.execute("SELECT 1")
+            with conn.cursor() as cur:
+              cur.execute("SELECT 1")
             db_ok = True
-        except Exception:
-            db_ok = False
-    return {"status": "ok", "ready": chatbot is not None and chatbot.ready_event.is_set(), "db": db_ok}
+        finally:
+          get_pool().putconn(conn)
+    except Exception:
+        db_ok = False
+
+    if not db_ok:
+        response.status_code = 503
+    return {"status": "ok" if db_ok else "degraded", "ready": chatbot is not None and chatbot.ready_event.is_set(), "db": db_ok}
 
 
 
-@app.get("/whoami")
-async def whoami(request: Request):
-    return {
-        "client_host": request.client.host,
-        "x_forwarded_for": request.headers.get("x-forwarded-for"),
-        "x_real_ip": request.headers.get("x-real-ip"),
-    }
 
 @app.post("/feedback")
 @limiter.limit("10/minute")
