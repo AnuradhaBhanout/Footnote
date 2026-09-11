@@ -47,3 +47,4 @@ jobs:
       working-directory: src
       env:
         DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+        OPENAI_API_KEY: sk-dummy-not-a-real-key
