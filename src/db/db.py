@@ -21,13 +21,13 @@ def get_pool():
 
 def get_conn():
     """Return a psycopg2 connection with pgvectortype registered."""
-    conn = get_pool.getconn()
+    conn = get_pool().getconn()
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT 1")
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
-        get_pool.putconn(conn, close=True)
-        conn = get_pool.getconn()
+        get_pool().putconn(conn, close=True)
+        conn = get_pool().getconn()
 
     try:
         register_vector(conn)
@@ -36,7 +36,7 @@ def get_conn():
     return conn
 
 def put_conn(conn):
-    get_pool.putconn(conn)
+    get_pool().putconn(conn)
 
 
 def init_db():
