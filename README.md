@@ -11,6 +11,13 @@ arXiv's search is literal keyword matching, not semantic. Query "recent papers o
 
 Footnote closes both gaps: dense embeddings match by meaning, so natural-language queries just work, and hybrid search + an LLM relevance judge turn matches into one synthesized answer — with follow-up memory and instant caching on repeat questions.
 
+**Same query, side by side:**
+
+| arXiv | Footnote |
+|---|---|
+| ![arXiv: zero results](docs/screenshots/arxiv-no-results.png) | ![Footnote: synthesized, sourced answer](docs/screenshots/footnote-answer.png) |
+| "What's new in retrieval-augmented generation?" → 0 results | Same query → synthesized summary table, every row backed by a verified citation in the sidebar |
+
 **Scope, stated honestly:** this is a fast multi-paper *topic survey* tool, not a single-paper deep-reader. For "explain this one paper in depth," arXiv itself or a NotebookLM-style tool already does that better — Footnote doesn't ingest full PDF text.
 
 ## What it does
