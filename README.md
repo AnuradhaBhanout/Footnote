@@ -265,4 +265,4 @@ Render, single web service, `--workers 1` (non-negotiable — see Quickstart).
 
 ## License
 
-No license file yet — add one (MIT is a reasonable default) before treating this as public.
+MIT
