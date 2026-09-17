@@ -134,13 +134,14 @@ async def resume(request:Request, body: ResumeRequest,chatbot:MCP_ChatBot = Depe
 @app.api_route("/health",methods=["GET","HEAD"])
 async def health(request: Request, response: Response):
     chatbot = getattr(request.app.state,"chatbot",None)
-    db_ok = False
+    db_ok = None
     try:
         conn = get_pool().getconn()
         try:
-            with conn.cursor() as cur:
-              cur.execute("SELECT 1")
-            db_ok = True
+            if request.query_params.get("deep"):
+              with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+                db_ok = True
         finally:
           get_pool().putconn(conn)
     except Exception:
