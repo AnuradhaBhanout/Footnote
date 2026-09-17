@@ -147,7 +147,7 @@ async def health(request: Request, response: Response):
     except Exception:
         db_ok = False
 
-    if not db_ok:
+    if db_ok is False:
         response.status_code = 503
     return {"status": "ok" if db_ok else "degraded", "ready": chatbot is not None and chatbot.ready_event.is_set(), "db": db_ok}
 
