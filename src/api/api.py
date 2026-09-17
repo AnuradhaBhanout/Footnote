@@ -136,9 +136,10 @@ async def health(request: Request, response: Response):
     chatbot = getattr(request.app.state,"chatbot",None)
     db_ok = None
     try:
-        conn = get_pool().getconn()
+       
         try:
             if request.query_params.get("deep"):
+              conn = get_pool().getconn()
               with conn.cursor() as cur:
                 cur.execute("SELECT 1")
                 db_ok = True
