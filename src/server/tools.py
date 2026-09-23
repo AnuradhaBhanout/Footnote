@@ -49,7 +49,7 @@ async def hybrid_search_papers(query: str,top_k: int = 5,alpha: float = 0.5)-> d
 
 
     # Executes the underlying hybrid search 
-    results = _hybrid_index.search(query,top_k=top_k,alpha=alpha)
+    results = asyncio.to_thread(_hybrid_index.search(query,top_k=top_k,alpha=alpha))
 
    ############# papers = load_all_papers()
 
