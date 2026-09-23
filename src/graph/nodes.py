@@ -368,8 +368,8 @@ class GraphNodes:
                         HumanMessage(content=state["current_query"]),
                         HumanMessage(content=f"Paper details:\n{json.dumps(result)}"),
                         HumanMessage(
-                            content="Using ONLY the paper details returned above, write your final "
-                            "plain-language summary now. Do not call any tools."
+                            content="Using ONLY the paper details returned above, write your final plain-language summary now. After every paper you mention, "
+                            "include its id exactly as [arXiv:<paper_id>]. Do not call any tools."
                         ),
                     ]
                     final_response =  await asyncio.wait_for( self.chatbot.llm.ainvoke(final_pass, config=config),timeout=12)
