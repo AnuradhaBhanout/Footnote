@@ -7,7 +7,7 @@ import server.tools as tools
 
 @pytest.fixture(autouse=True)
 def _isolate_search_papers(monkeypatch,tmp_path):
-    monkeypatch.setattr(tools,"PAPER_DIR",str(tmp_path))
+    
     monkeypatch.setattr(tools,"_insert_papers_sync",lambda paper_info, topic:None)
     monkeypatch.setattr(tools._hybrid_index,"refresh_if_stale",lambda:None)
 
