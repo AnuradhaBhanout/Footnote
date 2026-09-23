@@ -77,7 +77,8 @@ async def stream_graph_events(chatbot, graph_input, session_id: str, tags: list[
             
             answer_is_reliable = state.values.get("answer_is_reliable",False)
             fetched_papers = state.values.get("fetched_papers", []) if answer_is_reliable else []
-            cited_ids = [pid["paper_id"] for pid in fetched_papers if isinstance(pid,dict) and "paper_id" in pid] if citation_passed else []
+            verified = state.values.get("citation_verified", False)
+            cited_ids = [pid["paper_id"] for pid in fetched_papers if isinstance(pid,dict) and "paper_id" in pid] if citation_passed and verified else []
 
             trace_id = span.trace_id
             yield sse_event("done",{
