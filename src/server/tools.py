@@ -20,12 +20,6 @@ from server.mcp_app import mcp
 
 from server.relevance import evaluate_relevance,_quoted_phrase
 
-PAPER_DIR = "papers"
-
-
-
-
-
 
 
 #Call LLM for dynamic search across all saved papers on disk using hybrid search architecture.
@@ -112,26 +106,9 @@ async def search_papers(topic: str, max_results: int = 5) -> dict:              
     except asyncio.TimeoutError:
         logging.error(f"search_papers: arxiv timed out for topic '{topic}'")
         return {"paper_ids": [], "sufficient": False, "reason": "arXiv search timed out."}   # was: return []
-       # return []
-    
-    # Create directory for this topic
-    path = os.path.join(PAPER_DIR, topic.lower().replace(" ", "_"))
-    os.makedirs(path, exist_ok=True)
-    
-    file_path = os.path.join(path, "papers_info.json")
 
-  
 
     papers_info = {}
-    try:
-        with open(file_path, "r") as f:
-            for line in f:
-                if line.strip():
-                    record = json.loads(line)
-                    # Assuming you write { "paper_id": { ... } } or similar structure
-                    papers_info.update(record)
-    except FileNotFoundError:
-        papers_info = {}
 
     # Process each paper and add to papers_info  
     paper_ids = []
@@ -146,13 +123,6 @@ async def search_papers(topic: str, max_results: int = 5) -> dict:              
         }
         papers_info[paper.get_short_id()] = paper_info
     
-    # Save updated papers_info to json file
-    try:
-        with open(file_path, "w") as json_file:
-           for pid, info in papers_info.items():
-               json_file.write(json.dumps({pid: info}) + "\n")
-    except OSError:
-        print("Disk write skipped (read-only filesystem)", file=sys.stderr)
 
     await asyncio.to_thread(_insert_papers_sync, papers_info, topic)
 
