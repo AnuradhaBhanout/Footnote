@@ -486,7 +486,9 @@ class GraphNodes:
         logger.info(f"--- CITATION CHECK: verified={result.get('verified')} passed={result['passed']} issues={result['issues']}")
         if bool(result.get("verified")):
            get_client().score_current_trace(name="citation_pass_rate", value=1 if result["passed"] else 0, comment="; ".join(result["issues"]))
-        return {"citation_check_passed":result["passed"], "citation_issues":result["issues"]}
+        return {"citation_check_passed":result["passed"],
+                "citation_verified":bool(result.get("verified")),
+                 "citation_issues":result["issues"]}
 
 
     async def retry_with_feedback(self,state: GraphState) -> GraphState:
