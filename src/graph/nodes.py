@@ -88,6 +88,7 @@ class GraphNodes:
                             "draft_answer":result["answer"],
                             "fetched_papers":result.get("fetched_papers",[]),
                             "citation_check_passed":True,
+                            "citation_verified": True,
                             "answer_is_reliable": True,
                         }
                     break
@@ -369,8 +370,8 @@ class GraphNodes:
                         HumanMessage(content=state["current_query"]),
                         HumanMessage(content=f"Paper details:\n{json.dumps(result)}"),
                         HumanMessage(
-                            content="Using ONLY the paper details returned above, write your final plain-language summary now. After every paper you mention, "
-                            "include its id exactly as [arXiv:<paper_id>]. Do not call any tools."
+                            content="Using ONLY the paper details returned above, write your final plain-language summary now. Use each paper's exact title and "
+                            "right after every paper you mention include its id exactly as [arXiv:<paper_id>]. Do not call any tools."
                         ),
                     ]
                     final_response =  await asyncio.wait_for( self.chatbot.llm.ainvoke(final_pass, config=config),timeout=12)
@@ -490,10 +491,10 @@ class GraphNodes:
         if not verified and state.get("answer_is_reliable") and state.get("fetched_papers"):
             passed = False
             issues.append("Answer cites no paper ids - add [arXiv:<paper_id>] after every paper mantioned.")
-        logger.info(f"--- CITATION CHECK: verified={result.get('verified')} passed={result['passed']} issues={result['issues']}")
+        logger.info(f"--- CITATION CHECK: verified={verified} passed={passed} issues={issues}")
 
         if verified or not passed:
-           get_client().score_current_trace(name="citation_pass_rate", value=1 if result["passed"] else 0, comment="; ".join(issues))
+           get_client().score_current_trace(name="citation_pass_rate", value=1 if passed else 0, comment="; ".join(issues))
         return {"citation_check_passed":passed,
                 "citation_verified":verified,
                  "citation_issues":issues}

@@ -37,7 +37,7 @@ def build_system_prompt(tool_names_str: str) -> str:
            "STOP searching and tell the user you couldn't find matching papers — do NOT retry more than once.\n\n"
  
         "CITATION & INTEGRITY RULES:\n"
-        "- You must use the EXACT title and authors as returned by the tools.\n"
+        "- You must use the EXACT title and arXiv id as returned by the tools.\n"
         "- NEVER alter, paraphrase, or invent a paper title or finding.\n"
         "- If a paper is not relevant to the query, EXCLUDE it entirely.\n\n"
  
