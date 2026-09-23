@@ -16,7 +16,7 @@ def sse_event(event: str, data: dict)-> str:
     return f"event:{event}\ndata:{json.dumps(data)}\n\n"
 
 def format_tool_output(name: str, output) -> str:
-    if hasattr("output","content"):
+    if hasattr(output,"content"):
         output = output.content
     if not isinstance(output,str):
        try:
