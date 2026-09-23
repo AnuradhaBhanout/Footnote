@@ -208,7 +208,7 @@ class MCP_ChatBot:
  
         self._pg_pool = AsyncConnectionPool(
             DATABASE_URL,
-            min_size=1,
+            min_size=0,
             max_size=5,
             kwargs={"autocommit": True},
             open=False,

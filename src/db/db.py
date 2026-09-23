@@ -15,7 +15,7 @@ _pool = None
 def get_pool():
     global _pool
     if _pool is None:
-        _pool = psycopg2.pool.SimpleConnectionPool(1,5,DATABASE_URL,connect_timeout =10)
+        _pool = psycopg2.pool.SimpleConnectionPool(0,5,DATABASE_URL,connect_timeout =10)
     return _pool
 
 
