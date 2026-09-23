@@ -16,6 +16,7 @@ class GraphState(TypedDict):
     cache_hit: bool
     draft_answer: Optional[str]
     citation_check_passed: bool
+    citation_verified: bool
     citation_issues: list
     clarification_question: Optional[str]
     clarification_options: list

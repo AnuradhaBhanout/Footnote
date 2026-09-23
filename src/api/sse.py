@@ -5,6 +5,7 @@ import logging
 
 from langfuse import get_client, propagate_attributes
 from langfuse.langchain import CallbackHandler
+from db.citation_verifier import ARXIV_ID_PATTERN, _strip_version
 
 logger = logging.getLogger("RAG-API")
 langfuse = get_client()
@@ -78,7 +79,8 @@ async def stream_graph_events(chatbot, graph_input, session_id: str, tags: list[
             answer_is_reliable = state.values.get("answer_is_reliable",False)
             fetched_papers = state.values.get("fetched_papers", []) if answer_is_reliable else []
             verified = state.values.get("citation_verified", False)
-            cited_ids = [pid["paper_id"] for pid in fetched_papers if isinstance(pid,dict) and "paper_id" in pid] if citation_passed and verified else []
+            cited_in_answer = { _strip_version(i) for i in ARXIV_ID_PATTERN.findall(answer or "")}
+            cited_ids = [pid["paper_id"] for pid in fetched_papers if isinstance(pid,dict) and "paper_id" in pid and _strip_version(pid["paper_id"]) in cited_in_answer] if citation_passed and verified else []
 
             trace_id = span.trace_id
             yield sse_event("done",{
