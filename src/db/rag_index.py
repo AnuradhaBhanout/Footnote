@@ -171,6 +171,7 @@ class HybridIndex:
                "score":float(combined[i]),
                "dense_score": float(dense_norm[i]),
                "bm25_score":float(bm25_norm[i]),
+               "summary": self.texts[i][len(self.titles[i]) + 2:][:500],
                
            }
            for i in top_indices
