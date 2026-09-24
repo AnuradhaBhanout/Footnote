@@ -40,7 +40,7 @@ async def hybrid_search_papers(query: str,top_k: int = 5,alpha: float = 0.5)-> d
     #_ensure_index_loaded()
     await asyncio.to_thread(_ensure_index_loaded)
 
-
+    top_k = min(top_k, 10) 
 
     # Executes the underlying hybrid search 
     results = await asyncio.to_thread(_hybrid_index.search,query,top_k=top_k,alpha=alpha)
@@ -68,6 +68,8 @@ async def hybrid_search_papers(query: str,top_k: int = 5,alpha: float = 0.5)-> d
             }
             ####
     logging.info(f"[evaluator] sufficient={judgment.get('sufficient')} reason={judgment.get('reason')}")
+
+    results = [{k: v for k, v in r.items() if k != "summary"} for r in results]
 
     return {"results": results,"evaluator_verdict": judgment}  
 
