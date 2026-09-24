@@ -21,3 +21,5 @@
 {"query":"how do you make a chatbot use emotional intelligence and psychological principles to improve conversational coherence in LLMs?", "expected_paper_id":"2501.05032v2"}
 {"query":"can buildings themselves store heat to let a combined heat and power plant absorb more wind and solar", "expected_paper_id":"2001.10371v1"}
 {"query":"how can I turn doctors notes into structured fields I can actually query for a study", "expected_paper_id":"2110.10780v3"}
+
+{"query": "character-level versus token-level performance NLP model", "expected_paper_id": "2405.11357v3"}

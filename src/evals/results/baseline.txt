@@ -1,0 +1,44 @@
+﻿Baseline: min-max fusion, alpha sweep, 22 queries
+Commit: db3bf47   Date: 2026-09-24
+Note: rows "which NLP paper compares..." (original) vs "character-level versus token-level..." (agent rewrite)
+
+recall@5 0.952   MRR 0.810   n=21
+
+1.000       which deep learning library do I need to automated stock tra
+1.000       what deep learning approaches have been tried for segmenting
+0.333  <-- which framework lets me train a trading agent across multipl
+         expected 2111.05188v1
+         got      ['2111.09395v1', '2011.09607v2', '2111.05188v1', '1105.4424v1', '1906.02138v1']
+1.000       which model tackle the data heterogeneity issue occurs durin
+1.000       which NLP Processing Studies shows notable obstacles when tr
+1.000       is there an open source library for tokenizing and tagging T
+0.500  <-- what covers the whole workflow from market data ingestion th
+         expected 2111.09395v1
+         got      ['2011.09607v2', '2111.09395v1', '2111.05188v1', '2412.01490v4', '2301.08028v4']
+1.000       why is it so hard to get reliable emotion labels from heart 
+1.000        which open-source PyTorch library is use to analyze robustn
+1.000        is there an affordable physical robot I can use to test RL 
+0.333  <-- how do I test whether my RAG system's citations are actually
+         expected 2502.10881v1
+         got      ['2603.24216v1', '2510.20303v3', '2502.10881v1', '2408.12398v1', '2309.15217v2']
+1.000       which framework aims to improve model robustness and accurac
+1.000       which paper investigates how structured prompt can guide Lar
+1.000       Describe an architecture that matches transformers on string
+1.000       Is there a web tool designed to formatting software citation
+0.500  <-- which NLP paper compares the performance on character-level 
+         expected 2405.11357v3
+         got      ['1709.00028v1', '2405.11357v3', '2109.13723v1', '2110.10780v3', '2411.18583v1']
+1.000       when during training does a model start memorising facts and
+1.000       how do you make a chatbot use emotional intelligence and psy
+1.000       can buildings themselves store heat to let a combined heat a
+0.333  <-- how can I turn doctors notes into structured fields I can ac
+         expected 2110.10780v3
+         got      ['2307.10652v5', '2603.24216v1', '2110.10780v3', '1602.06703v1', '2601.16513v1']
+0.000  <-- character-level versus token-level performance NLP model
+         expected 2405.11357v3
+         got      ['1709.00028v1', '2311.08620v1', '1708.05515v1', '2109.13723v1', '2110.10780v3']
+alpha=0.0  recall@5 0.810  MRR 0.639
+alpha=0.25  recall@5 0.857  MRR 0.710
+alpha=0.5  recall@5 0.952  MRR 0.810
+alpha=0.75  recall@5 0.952  MRR 0.817
+alpha=1.0  recall@5 0.952  MRR 0.849
