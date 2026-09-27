@@ -92,6 +92,10 @@ def init_db():
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS semantic_cache_hnsw ON semantic_cache USING hnsw (embedding vector_cosine_ops);
             """)
+
+            cur.execute("""
+                 CREATE INDEX IF NOT EXISTS semantic_cache_corpus_version ON semantic_cache (corpus_version);
+               """)
             
             # Add papers
             cur.execute("""
